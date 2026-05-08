@@ -26,11 +26,26 @@ export interface Finding {
   tokenImpact?: number; // estimated tokens saved if fixed
 }
 
+export interface Suppression {
+  ruleId: string;
+  file?: string;
+  reason: string;
+  expires?: string;
+  owner?: string;
+}
+
+export interface SuppressionSummary {
+  active: number;
+  expired: number;
+  suppressedFindings: number;
+}
+
 export interface DimensionScore {
   dimension: Dimension;
   score: number; // 0-100
   weight: number;
   findings: Finding[];
+  deductions: Array<{ severity: Severity; count: number; points: number }>;
   summary: string;
 }
 
@@ -103,6 +118,8 @@ export interface AnalysisResult {
   score: Score;
   savings: SavingsEstimate;
   findings: Finding[];
+  suppressedFindings: Finding[];
+  suppressionSummary: SuppressionSummary;
   recommendations: Recommendation[];
 }
 
@@ -115,6 +132,10 @@ export interface Recommendation {
   tokenSavingsKind?: 'direct' | 'projected';
   costSavings: number; // USD/month estimated
   effort: 'trivial' | 'easy' | 'moderate' | 'significant';
+  ruleIds: string[];
+  files: string[];
+  safety: 'safe' | 'review-required' | 'manual';
+  autofixable: boolean;
   before?: string;
   after?: string;
 }
@@ -125,12 +146,19 @@ export const AnalyzerOptionsSchema = z.object({
   repoPath: z.string(),
   outputFormat: z.enum(['json', 'pretty', 'sarif']).default('pretty'),
   includeEvidence: z.boolean().default(true),
-  maxFileSize: z.number().default(100_000), // 100KB max per file
-  maxFiles: z.number().default(50),
-  maxDepth: z.number().default(5),
-  includeFiles: z.array(z.string()).optional(),
-  assumedDailyInvocations: z.number().default(50), // for cost modeling
-  assumedModelCostPer1kTokens: z.number().default(0.01), // avg blended
+  maxFileSize: z.number().int().positive().default(100_000), // 100KB max per file
+  maxFiles: z.number().int().positive().default(50),
+  maxDepth: z.number().int().nonnegative().default(5),
+  includeFiles: z.array(z.string().min(1)).optional(),
+  suppressions: z.array(z.object({
+    ruleId: z.string().min(1),
+    file: z.string().min(1).optional(),
+    reason: z.string().min(1),
+    expires: z.string().min(1).optional(),
+    owner: z.string().min(1).optional(),
+  })).default([]),
+  assumedDailyInvocations: z.number().nonnegative().default(50), // for cost modeling
+  assumedModelCostPer1kTokens: z.number().nonnegative().default(0.01), // avg blended
 });
 
 export type AnalyzerOptions = z.infer<typeof AnalyzerOptionsSchema>;

@@ -1,6 +1,6 @@
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve, relative, isAbsolute } from 'node:path';
 import { spawn } from 'node:child_process';
 
 export type ReviewSourceKind = 'local' | 'github';
@@ -153,7 +153,8 @@ function formatGitHubDisplay(link: GitHubLink): string {
 async function assertInside(root: string, candidate: string): Promise<void> {
   const realRoot = resolve(root);
   const realCandidate = resolve(candidate);
-  if (realCandidate !== realRoot && !realCandidate.startsWith(`${realRoot}/`)) {
+  const rel = relative(realRoot, realCandidate);
+  if (rel !== '' && (rel.startsWith('..') || isAbsolute(rel))) {
     throw new Error('Resolved GitHub path escapes the cloned repository boundary');
   }
 }
@@ -189,4 +190,3 @@ function run(command: string, args: string[], cwd?: string): Promise<void> {
     });
   });
 }
-

@@ -3,7 +3,7 @@
 **Version:** 1.0.0-draft  
 **Status:** Working Draft  
 **Date:** 2026-05-05  
-**License:** CC BY-SA 4.0  
+**License:** MIT  
 
 ---
 
@@ -1842,4 +1842,4 @@ See Section 3 for formal definitions. This glossary provides informal explanatio
 
 ---
 
-*This standard is published under CC BY-SA 4.0. Organizations may freely adopt, extend, and reference CATES with attribution.*
+*This standard is published under the MIT License. See [LICENSE](LICENSE).*

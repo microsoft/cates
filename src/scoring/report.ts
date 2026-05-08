@@ -1,4 +1,5 @@
 import type { AnalysisResult } from '../types.js';
+import { getRule } from '../rules/catalog.js';
 
 /**
  * Format analysis results for different output targets.
@@ -32,6 +33,15 @@ function toPretty(result: AnalysisResult): string {
   lines.push(`  ${gradeEmoji} Overall Score: ${score.overall}/100 (Grade: ${score.grade})`);
   lines.push('');
 
+  lines.push('  ✨ Executive Summary:');
+  lines.push(`     Top risk: ${topRisk(findings)}`);
+  lines.push(`     Biggest savings: ${topSavings(recommendations)}`);
+  lines.push(`     First fix: ${firstFix(recommendations)}`);
+  if (result.suppressionSummary.suppressedFindings > 0 || result.suppressionSummary.expired > 0) {
+    lines.push(`     Suppressions: ${result.suppressionSummary.suppressedFindings} finding(s) hidden, ${result.suppressionSummary.expired} expired`);
+  }
+  lines.push('');
+
   // Discovery Summary
   lines.push('  📁 Files Discovered:');
   lines.push(`     ${discovery.files.length} config file(s) found`);
@@ -42,6 +52,12 @@ function toPretty(result: AnalysisResult): string {
   }
   if (discovery.deadFileTokens > 0) {
     lines.push(`     ${discovery.deadFileTokens.toLocaleString()} tokens in dead/unreachable files`);
+  }
+  lines.push('');
+
+  lines.push('  🧭 Coverage Matrix:');
+  for (const row of coverageRows(result)) {
+    lines.push(`     ${row.present ? '✓' : '·'} ${padRight(row.label, 18)} ${row.detail}`);
   }
   lines.push('');
 
@@ -91,6 +107,9 @@ function toPretty(result: AnalysisResult): string {
       if (f.suggestion) {
         lines.push(`       💡 ${f.suggestion}`);
       }
+      if (f.evidence) {
+        lines.push(`       Evidence: ${formatEvidence(f.evidence)}`);
+      }
       lines.push('');
     }
   }
@@ -102,6 +121,12 @@ function toPretty(result: AnalysisResult): string {
     for (const rec of recommendations.slice(0, 5)) {
       lines.push(`     ${rec.priority}. ${rec.title}`);
       lines.push(`        ${rec.description}`);
+      if (rec.ruleIds.length > 0) {
+        lines.push(`        Rules: ${rec.ruleIds.join(', ')} | Safety: ${rec.safety}${rec.autofixable ? ' | Autofix available' : ''}`);
+      }
+      if (rec.files.length > 0) {
+        lines.push(`        Files: ${rec.files.slice(0, 3).join(', ')}${rec.files.length > 3 ? ` (+${rec.files.length - 3} more)` : ''}`);
+      }
       if (rec.tokenSavings > 0) {
         const savingsLabel = rec.tokenSavingsKind === 'projected' ? 'Projected savings' : 'Savings';
         lines.push(`        ${savingsLabel}: ~${rec.tokenSavings} tokens/invocation (${formatPercent(rec.tokenSavingsPercentage ?? 0)} equivalent) | ~$${rec.costSavings.toFixed(2)}/month`);
@@ -134,9 +159,13 @@ function toSarif(result: AnalysisResult): string {
           version: '1.0.0',
           rules: [...new Set(result.findings.map(f => f.ruleId))].map(id => {
             const finding = result.findings.find(f => f.ruleId === id)!;
+            const rule = getRule(id);
             return {
               id,
-              shortDescription: { text: finding.message },
+              name: rule?.title ?? id,
+              shortDescription: { text: rule?.summary ?? finding.message },
+              fullDescription: { text: rule?.detection ?? finding.message },
+              help: { text: rule?.remediation ?? finding.suggestion ?? finding.message },
               defaultConfiguration: { level: sarifLevel(finding.severity) },
             };
           }),
@@ -146,6 +175,11 @@ function toSarif(result: AnalysisResult): string {
         ruleId: f.ruleId,
         level: sarifLevel(f.severity),
         message: { text: f.message + (f.suggestion ? `\n💡 ${f.suggestion}` : '') },
+        properties: {
+          dimension: f.dimension,
+          confidence: f.confidence,
+          tokenImpact: f.tokenImpact,
+        },
         locations: [{
           physicalLocation: {
             artifactLocation: { uri: f.file },
@@ -193,4 +227,40 @@ function groupBy<T>(arr: T[], fn: (item: T) => string): Record<string, T[]> {
     (result[key] ??= []).push(item);
   }
   return result;
+}
+
+function topRisk(findings: AnalysisResult['findings']): string {
+  const top = [...findings].sort((a, b) => severityRank(a.severity) - severityRank(b.severity))[0];
+  return top ? `[${top.ruleId}] ${top.message}` : 'No active findings';
+}
+
+function topSavings(recommendations: AnalysisResult['recommendations']): string {
+  const top = [...recommendations].sort((a, b) => b.tokenSavings - a.tokenSavings)[0];
+  return top && top.tokenSavings > 0
+    ? `${top.title} (~${top.tokenSavings.toLocaleString()} tokens/invocation)`
+    : 'No material token waste detected';
+}
+
+function firstFix(recommendations: AnalysisResult['recommendations']): string {
+  return recommendations[0]?.title ?? 'No remediation needed';
+}
+
+function coverageRows(result: AnalysisResult): Array<{ label: string; present: boolean; detail: string }> {
+  const files = result.discovery.files;
+  const hasPath = (pattern: RegExp) => files.some(file => pattern.test(file.relativePath));
+  const countType = (type: string) => files.filter(file => file.type === type).length;
+  return [
+    { label: 'Copilot', present: hasPath(/^\.github\/copilot|^\.github\/prompts|^\.github\/copilot-instructions\.md$/), detail: `${files.filter(file => file.relativePath.startsWith('.github/')).length} GitHub config file(s)` },
+    { label: 'Claude', present: hasPath(/(^|\/)\.claude\/|(^|\/)CLAUDE\.md$/i), detail: `${files.filter(file => /\.claude\/|CLAUDE\.md$/i.test(file.relativePath)).length} Claude file(s)` },
+    { label: 'Cursor', present: hasPath(/(^|\/)\.cursor\/|\.cursorrules$/i), detail: `${files.filter(file => /\.cursor\/|\.cursorrules$/i.test(file.relativePath)).length} Cursor file(s)` },
+    { label: 'Gemini', present: hasPath(/(^|\/)\.gemini\/|(^|\/)GEMINI\.md$/i), detail: `${files.filter(file => /\.gemini\/|GEMINI\.md$/i.test(file.relativePath)).length} Gemini file(s)` },
+    { label: 'MCP', present: countType('mcp-config') > 0, detail: `${countType('mcp-config')} MCP config(s)` },
+    { label: 'Hooks', present: countType('hooks-config') > 0, detail: `${countType('hooks-config')} hook config(s)` },
+    { label: 'Setup', present: countType('setup-steps') > 0, detail: `${countType('setup-steps')} setup config(s)` },
+    { label: 'Prompts', present: countType('prompt-file') > 0, detail: `${countType('prompt-file')} prompt file(s)` },
+  ];
+}
+
+function formatEvidence(evidence: string): string {
+  return evidence.replace(/\s+/g, ' ').slice(0, 120);
 }

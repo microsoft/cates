@@ -58,6 +58,8 @@ This tool is hardened against adversarial configs:
 - **No execution** — never runs or evaluates discovered content
 - **Secret redaction** — findings never expose full secrets
 - **No network calls** — purely local analysis (zero data exfiltration risk)
+- **Strict CLI validation** — invalid formats, gates, severities, and limits fail loudly
+- **Auditable suppressions** — `.cates.yml` suppressions require reasons and support expiration dates
 
 ## ⚡ Token Efficiency (Dogfooding)
 
@@ -105,6 +107,16 @@ Common analyze options:
 ```
 
 `review` accepts local folders and GitHub URLs. For private repositories, authenticate with `gh auth login` and use `review`; CATES uses local GitHub CLI credentials instead of asking for tokens.
+
+Policy suppressions can be used for documented false positives or temporary accepted risk:
+
+```yaml
+suppressions:
+  - ruleId: SEC004
+    file: .github/copilot-instructions.md
+    reason: Covered by organization-level prompt protection
+    expires: 2026-12-31
+```
 
 ## 🏗 Architecture
 
@@ -182,4 +194,4 @@ cates-analyzer explain TE004
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

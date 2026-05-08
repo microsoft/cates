@@ -9,7 +9,8 @@ export function generateRecommendations(
   discovery: DiscoveryResult,
   options: AnalyzerOptions,
 ): Recommendation[] {
-  const recommendations: Recommendation[] = [];
+  type DraftRecommendation = Omit<Recommendation, 'ruleIds' | 'files' | 'safety' | 'autofixable'>;
+  const recommendations: DraftRecommendation[] = [];
 
   // Critical security findings → immediate action
   const criticalSecurity = findings.filter(f => f.dimension === 'security' && f.severity === 'critical');
@@ -385,6 +386,7 @@ export function generateRecommendations(
     .sort((a, b) => a.priority - b.priority)
     .map(rec => ({
       ...rec,
+      ...recommendationMetadata(rec.title, findings),
       tokenSavingsPercentage: discovery.totalTokens > 0
         ? Math.round((rec.tokenSavings / discovery.totalTokens) * 1000) / 10
         : 0,
@@ -398,4 +400,59 @@ function projectedSavings(tokensPerAffectedInvocation: number, affectedInvocatio
 
 function hasDirectTokenImpact(title: string): boolean {
   return /Deduplicate|Replace inline|verbosity|generic filler|always-loaded|negative constraints|Split oversized/i.test(title);
+}
+
+const AUTOFIXABLE_RULES = new Set(['SEC004', 'PRM001', 'TE007']);
+
+function recommendationMetadata(
+  title: string,
+  findings: Finding[],
+): Pick<Recommendation, 'ruleIds' | 'files' | 'safety' | 'autofixable'> {
+  const ruleIds = inferRuleIds(title);
+  const relatedFindings = ruleIds.length > 0
+    ? findings.filter(finding => ruleIds.includes(finding.ruleId))
+    : [];
+  const files = [...new Set(relatedFindings
+    .map(finding => finding.file)
+    .filter(file => file && !file.startsWith('(')))]
+    .sort();
+  const safety = relatedFindings.some(finding => finding.severity === 'critical' || finding.dimension === 'security')
+    ? 'manual'
+    : relatedFindings.some(finding => finding.severity === 'high')
+      ? 'review-required'
+      : 'safe';
+
+  return {
+    ruleIds,
+    files,
+    safety,
+    autofixable: ruleIds.length > 0 && ruleIds.some(ruleId => AUTOFIXABLE_RULES.has(ruleId)),
+  };
+}
+
+function inferRuleIds(title: string): string[] {
+  const mapping: Array<[RegExp, string[]]> = [
+    [/secrets from agent configurations/i, ['SEC001']],
+    [/Deduplicate/i, ['TE006', 'TE007']],
+    [/inline code examples/i, ['TE002']],
+    [/verbosity/i, ['TE004']],
+    [/generic filler/i, ['TE003']],
+    [/always-loaded/i, ['TE001']],
+    [/negative constraints/i, ['TE005']],
+    [/contradictory/i, ['CNF001']],
+    [/missing instruction topics/i, ['CMP002']],
+    [/oversized prompt/i, ['PRM002']],
+    [/purpose headers/i, ['PRM001']],
+    [/MCP configs/i, ['MCP002']],
+    [/MCP server configs/i, ['MCP004']],
+    [/HTTPS/i, ['MCP003']],
+    [/command injection|MCP stdio/i, ['MCP005']],
+    [/pipe-to-shell/i, ['STP001']],
+    [/Cache dependencies/i, ['STP002']],
+    [/test framework/i, ['STP004']],
+    [/non-interactive/i, ['HK001']],
+    [/heavy hooks/i, ['HK002']],
+    [/prompt protection/i, ['SEC004']],
+  ];
+  return mapping.find(([pattern]) => pattern.test(title))?.[1] ?? [];
 }

@@ -34,12 +34,19 @@ export function calculateScore(
     }
 
     score = Math.max(0, Math.min(100, score));
+    const deductions = Object.entries(SEVERITY_DEDUCTIONS)
+      .map(([severity, points]) => {
+        const count = dimFindings.filter(f => f.severity === severity).length;
+        return { severity: severity as DimensionScore['deductions'][number]['severity'], count, points: count * points };
+      })
+      .filter(deduction => deduction.count > 0);
 
     dimensions.push({
       dimension: dimension as Dimension,
       score,
       weight,
       findings: dimFindings,
+      deductions,
       summary: getSummary(dimension as Dimension, score, dimFindings.length),
     });
   }

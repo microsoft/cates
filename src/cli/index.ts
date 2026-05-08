@@ -67,16 +67,22 @@ program
   .option('--policy <path>', 'Path to .cates.yml/.json policy file')
   .option('--require-level <n>', 'Required CATES level', '1')
   .action(async (path: string, opts) => {
-    const repoPath = resolve(path);
-    const policy = await loadPolicy(repoPath, opts.policy);
-    const result = await analyze({ repoPath });
-    const conformance = evaluateConformance(result, { ...policy, requireLevel: parseLevel(opts.requireLevel) });
-    if (opts.format === 'json') {
-      process.stdout.write(JSON.stringify({ repoPath, conformance }, null, 2) + '\n');
-    } else {
-      process.stdout.write(formatConformance(conformance) + '\n');
+    try {
+      const repoPath = resolve(path);
+      const format = formatOpt(opts.format, ['pretty', 'json']);
+      const policy = await loadPolicy(repoPath, stringOpt(opts.policy));
+      const result = await analyze({ repoPath, suppressions: policy.suppressions ?? [] });
+      const conformance = evaluateConformance(result, { ...policy, requireLevel: parseLevel(opts.requireLevel) });
+      if (format === 'json') {
+        process.stdout.write(JSON.stringify({ repoPath, conformance }, null, 2) + '\n');
+      } else {
+        process.stdout.write(formatConformance(conformance) + '\n');
+      }
+      process.exit(conformance.passed ? 0 : 1);
+    } catch (err) {
+      console.error('Error:', err instanceof Error ? err.message : err);
+      process.exit(1);
     }
-    process.exit(conformance.passed ? 0 : 1);
   });
 
 program
@@ -84,12 +90,18 @@ program
   .description('Print the machine-readable CATES rule catalog')
   .option('-f, --format <format>', 'Output format: json or pretty', 'json')
   .action((opts) => {
-    if (opts.format === 'pretty') {
-      for (const rule of RULE_CATALOG) {
-        process.stdout.write(`${rule.id} ${rule.title} [${rule.severity}/${rule.dimension}]\n  ${rule.summary}\n`);
+    try {
+      const format = formatOpt(opts.format, ['json', 'pretty']);
+      if (format === 'pretty') {
+        for (const rule of RULE_CATALOG) {
+          process.stdout.write(`${rule.id} ${rule.title} [${rule.severity}/${rule.dimension}]\n  ${rule.summary}\n`);
+        }
+      } else {
+        process.stdout.write(rulesAsJson() + '\n');
       }
-    } else {
-      process.stdout.write(rulesAsJson() + '\n');
+    } catch (err) {
+      console.error('Error:', err instanceof Error ? err.message : err);
+      process.exit(1);
     }
   });
 
@@ -112,11 +124,17 @@ program
   .argument('[path]', 'Directory containing repositories', '.')
   .option('-f, --format <format>', 'Output format: pretty or json', 'pretty')
   .action(async (path: string, opts) => {
-    const portfolio = await scanPortfolio(path);
-    if (opts.format === 'json') {
-      process.stdout.write(JSON.stringify(portfolio, null, 2) + '\n');
-    } else {
-      process.stdout.write(formatPortfolio(portfolio) + '\n');
+    try {
+      const format = formatOpt(opts.format, ['pretty', 'json']);
+      const portfolio = await scanPortfolio(path);
+      if (format === 'json') {
+        process.stdout.write(JSON.stringify(portfolio, null, 2) + '\n');
+      } else {
+        process.stdout.write(formatPortfolio(portfolio) + '\n');
+      }
+    } catch (err) {
+      console.error('Error:', err instanceof Error ? err.message : err);
+      process.exit(1);
     }
   });
 
@@ -134,7 +152,7 @@ async function runAnalyze(path: string, opts: Record<string, unknown>): Promise<
 async function executeAnalyze(repoPath: string, opts: Record<string, unknown>, displayPath?: string): Promise<number> {
   const policy = await loadPolicy(repoPath, stringOpt(opts.policy));
   const includeFiles = fileListOpt(opts.files);
-  const format = formatOpt(opts.format);
+  const format = formatOpt(opts.format, ['pretty', 'json', 'sarif']);
 
   if (opts.individual) {
     if (includeFiles.length === 0) throw new Error('--individual requires --files');
@@ -181,20 +199,21 @@ function buildAnalyzeOptions(
     repoPath,
     outputFormat: formatOpt(opts.format),
     includeEvidence: opts.evidence !== false,
-    assumedDailyInvocations: numberOpt(opts.invocations) ?? policy.assumedDailyInvocations ?? 50,
-    assumedModelCostPer1kTokens: numberOpt(opts.cost) ?? policy.assumedModelCostPer1kTokens ?? 0.01,
-    maxFiles: numberOpt(opts.maxFiles) ?? 50,
-    maxDepth: numberOpt(opts.maxDepth) ?? 5,
+    assumedDailyInvocations: numberOpt(opts.invocations, '--invocations', { min: 0 }) ?? policy.assumedDailyInvocations ?? 50,
+    assumedModelCostPer1kTokens: numberOpt(opts.cost, '--cost', { min: 0 }) ?? policy.assumedModelCostPer1kTokens ?? 0.01,
+    maxFiles: numberOpt(opts.maxFiles, '--max-files', { min: 1, integer: true }) ?? 50,
+    maxDepth: numberOpt(opts.maxDepth, '--max-depth', { min: 0, integer: true }) ?? 5,
     includeFiles: includeFiles.length > 0 ? includeFiles : undefined,
+    suppressions: policy.suppressions ?? [],
   };
 }
 
 function evaluateResultGates(result: AnalysisResult, policy: CatesPolicy, opts: Record<string, unknown>): number {
   const gatePolicy: CatesPolicy = {
-    minScore: numberOpt(opts.minScore),
+    minScore: numberOpt(opts.minScore, '--min-score', { min: 0, max: 100 }),
     requireLevel: parseLevelOpt(opts.requireLevel),
     failOn: severityList(opts.failOn),
-    maxAlwaysLoadedTokens: numberOpt(opts.maxAlwaysLoaded),
+    maxAlwaysLoadedTokens: numberOpt(opts.maxAlwaysLoaded, '--max-always-loaded', { min: 0, integer: true }),
   };
   const gates = evaluateGates(result, policy, gatePolicy);
   if (!gates.passed) {
@@ -251,10 +270,18 @@ function formatPortfolio(portfolio: Awaited<ReturnType<typeof scanPortfolio>>): 
   return lines.join('\n');
 }
 
-function numberOpt(value: unknown): number | undefined {
+function numberOpt(
+  value: unknown,
+  name: string,
+  constraints: { min?: number; max?: number; integer?: boolean } = {},
+): number | undefined {
   if (typeof value !== 'string') return undefined;
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
+  if (!Number.isFinite(parsed)) throw new Error(`${name} must be a number.`);
+  if (constraints.integer && !Number.isInteger(parsed)) throw new Error(`${name} must be an integer.`);
+  if (constraints.min !== undefined && parsed < constraints.min) throw new Error(`${name} must be at least ${constraints.min}.`);
+  if (constraints.max !== undefined && parsed > constraints.max) throw new Error(`${name} must be at most ${constraints.max}.`);
+  return parsed;
 }
 
 function stringOpt(value: unknown): string | undefined {
@@ -269,14 +296,19 @@ function fileListOpt(value: unknown): string[] {
     .filter(file => file.length > 0);
 }
 
-function formatOpt(value: unknown): 'pretty' | 'json' | 'sarif' {
-  return value === 'json' || value === 'sarif' ? value : 'pretty';
+function formatOpt<T extends readonly ('pretty' | 'json' | 'sarif')[]>(
+  value: unknown,
+  allowed: T = ['pretty', 'json', 'sarif'] as unknown as T,
+): T[number] {
+  const format = typeof value === 'string' ? value : 'pretty';
+  if (allowed.includes(format as T[number])) return format as T[number];
+  throw new Error(`--format must be one of: ${allowed.join(', ')}.`);
 }
 
 function parseLevel(value: unknown): 1 | 2 | 3 {
   const parsed = Number(value);
   if (parsed === 1 || parsed === 2 || parsed === 3) return parsed;
-  return 1;
+  throw new Error('--require-level must be 1, 2, or 3.');
 }
 
 function parseLevelOpt(value: unknown): 1 | 2 | 3 | undefined {
@@ -285,7 +317,12 @@ function parseLevelOpt(value: unknown): 1 | 2 | 3 | undefined {
 
 function severityList(value: unknown): Severity[] | undefined {
   if (typeof value !== 'string') return undefined;
-  const severities = value.split(',').map(v => v.trim()).filter(isSeverity);
+  const values = value.split(',').map(v => v.trim()).filter(v => v.length > 0);
+  const invalid = values.filter(v => !isSeverity(v));
+  if (invalid.length > 0) {
+    throw new Error(`--fail-on contains invalid severities: ${invalid.join(', ')}. Allowed: critical, high, medium, low, info.`);
+  }
+  const severities = values.filter(isSeverity);
   return severities.length > 0 ? severities : undefined;
 }
 

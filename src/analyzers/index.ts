@@ -10,6 +10,7 @@ import { analyzePrompts, analyzeMcp, analyzeSetupSteps, analyzeHooks, analyzeEdi
 import { calculateScore } from '../scoring/calculator.js';
 import { generateRecommendations } from '../scoring/recommendations.js';
 import { calculateSavings } from '../scoring/savings.js';
+import { applySuppressions } from '../suppressions.js';
 
 /**
  * Main analysis orchestrator.
@@ -64,7 +65,7 @@ export async function analyze(rawOptions: Partial<AnalyzerOptions> & { repoPath:
     });
   }
 
-  const allFindings: Finding[] = [
+  const rawFindings: Finding[] = [
     ...budgetFindings,
     ...tokenFindings,
     ...securityFindings,
@@ -77,12 +78,13 @@ export async function analyze(rawOptions: Partial<AnalyzerOptions> & { repoPath:
     ...hookFindings,
     ...editorFindings,
   ];
+  const suppressionResult = applySuppressions(rawFindings, options.suppressions);
 
   // Phase 3: Score
-  const score = calculateScore(allFindings, discovery, options);
+  const score = calculateScore(suppressionResult.findings, discovery, options);
 
   // Phase 4: Recommendations (prioritized, actionable)
-  const recommendations = generateRecommendations(allFindings, discovery, options);
+  const recommendations = generateRecommendations(suppressionResult.findings, discovery, options);
   const savings = calculateSavings(score, discovery, recommendations, options);
 
   return {
@@ -91,7 +93,9 @@ export async function analyze(rawOptions: Partial<AnalyzerOptions> & { repoPath:
     discovery,
     score,
     savings,
-    findings: allFindings,
+    findings: suppressionResult.findings,
+    suppressedFindings: suppressionResult.suppressedFindings,
+    suppressionSummary: suppressionResult.summary,
     recommendations,
   };
 }

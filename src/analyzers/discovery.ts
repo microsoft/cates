@@ -1,4 +1,4 @@
-import { resolve, relative } from 'node:path';
+import { resolve, relative, isAbsolute } from 'node:path';
 import { readdir, stat, readFile, realpath } from 'node:fs/promises';
 import type { DiscoveredFile, DiscoveryResult, ConfigType, ConfigScope, AnalyzerOptions } from '../types.js';
 import { countTokens } from '../utils/tokenizer.js';
@@ -89,18 +89,22 @@ const CONFIG_PATTERNS: Array<{ pattern: RegExp; type: ConfigType; scope: ConfigS
 type FileClassification = { type: ConfigType; scope: ConfigScope };
 
 export async function discoverFiles(options: AnalyzerOptions): Promise<DiscoveryResult> {
-  const repoRoot = resolve(options.repoPath);
+  const repoRoot = await realpath(resolve(options.repoPath));
   const files: DiscoveredFile[] = [];
   let filesScanned = 0;
 
   async function addFile(fullPath: string, relativePath: string, match: FileClassification): Promise<void> {
     filesScanned++;
+    const realFullPath = await realpath(fullPath);
+    if (!isInside(repoRoot, realFullPath)) {
+      throw new Error(`Discovered file escapes repository boundary: ${relativePath}`);
+    }
 
     // Security: enforce size limit
-    const fileStat = await stat(fullPath);
+    const fileStat = await stat(realFullPath);
     if (fileStat.size > options.maxFileSize) {
       files.push({
-        path: fullPath,
+        path: realFullPath,
         relativePath,
         type: match.type,
         scope: match.scope,
@@ -112,13 +116,13 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
     }
 
     // Security: skip binary files
-    const content = await readFile(fullPath, 'utf-8');
+    const content = await readFile(realFullPath, 'utf-8');
     if (isBinary(content)) return;
 
     const tokenCount = countTokens(content);
 
     files.push({
-      path: fullPath,
+      path: realFullPath,
       relativePath,
       type: match.type,
       scope: match.scope,
@@ -133,12 +137,10 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
       throw new Error(`--files listed ${includeFiles.length} files, exceeding --max-files ${options.maxFiles}`);
     }
 
-    const realRepoRoot = await realpath(repoRoot);
-
     for (const includeFile of includeFiles) {
       const fullPath = resolve(repoRoot, includeFile);
       const realFilePath = await realpath(fullPath);
-      if (realFilePath !== realRepoRoot && !realFilePath.startsWith(`${realRepoRoot}/`)) {
+      if (!isInside(repoRoot, realFilePath)) {
         throw new Error(`Included file escapes repository boundary: ${includeFile}`);
       }
 
@@ -147,7 +149,7 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
         throw new Error(`Included path must be a file: ${includeFile}`);
       }
 
-      const relativePath = relative(realRepoRoot, realFilePath).split('\\').join('/');
+      const relativePath = relative(repoRoot, realFilePath).split('\\').join('/');
       const match = CONFIG_PATTERNS.find(p => p.pattern.test(relativePath)) ?? {
         type: 'unknown' as const,
         scope: 'conditional' as const,
@@ -176,7 +178,7 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
       if (entry.isSymbolicLink()) {
         try {
           const real = await realpath(fullPath);
-          if (!real.startsWith(repoRoot)) continue; // symlink escape attempt
+          if (!isInside(repoRoot, real)) continue; // symlink escape attempt
         } catch {
           continue; // broken symlink
         }
@@ -237,4 +239,9 @@ function isBinary(content: string): boolean {
     if (code < 32 && code !== 9 && code !== 10 && code !== 13) nonPrintable++;
   }
   return nonPrintable / sample.length > 0.1;
+}
+
+function isInside(root: string, candidate: string): boolean {
+  const rel = relative(root, candidate);
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
 }

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import type { Severity } from './types.js';
+import type { Severity, Suppression } from './types.js';
 
 export interface CatesPolicy {
   minScore?: number;
@@ -11,12 +11,7 @@ export interface CatesPolicy {
   maxAlwaysLoadedTokens?: number;
   assumedDailyInvocations?: number;
   assumedModelCostPer1kTokens?: number;
-  suppressions?: Array<{
-    ruleId: string;
-    file?: string;
-    reason: string;
-    expires?: string;
-  }>;
+  suppressions?: Suppression[];
 }
 
 export const DEFAULT_POLICY: Required<Pick<CatesPolicy, 'minScore' | 'requireLevel' | 'failOn' | 'maxAlwaysLoadedTokens'>> = {
@@ -70,5 +65,11 @@ function isSeverity(value: unknown): value is Severity {
 function isSuppression(value: unknown): value is NonNullable<CatesPolicy['suppressions']>[number] {
   if (!value || typeof value !== 'object') return false;
   const item = value as Record<string, unknown>;
-  return typeof item['ruleId'] === 'string' && typeof item['reason'] === 'string';
+  return typeof item['ruleId'] === 'string'
+    && item['ruleId'].trim().length > 0
+    && typeof item['reason'] === 'string'
+    && item['reason'].trim().length > 0
+    && (item['file'] === undefined || typeof item['file'] === 'string')
+    && (item['expires'] === undefined || typeof item['expires'] === 'string')
+    && (item['owner'] === undefined || typeof item['owner'] === 'string');
 }

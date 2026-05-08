@@ -14,6 +14,13 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CATES-v1.0.md",
+    "docs"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/cli/index.ts",
