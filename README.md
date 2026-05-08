@@ -66,7 +66,7 @@ This tool practices what it preaches:
 - **Zero LLM calls** for core scoring — pure heuristic-based analysis
 - **Real tokenizer** (`cl100k_base` via `js-tiktoken`) for accurate cost modeling
 - **Config precedence awareness** — knows which files are always-loaded vs conditional
-- **Monthly cost projections** based on actual token counts and usage assumptions
+- **Savings projections** with conservative direct-token savings, projected retry/tool-call savings, and monthly/annualized cost impact
 
 ## 📁 Files It Discovers
 
@@ -75,7 +75,7 @@ This tool practices what it preaches:
 | `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `QWEN.md`, `.ai/instructions.md`, `.github/copilot-instructions.md` | Root instructions | Always-loaded |
 | Nested `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `QWEN.md` | Scoped instructions | Conditional |
 | `.github/prompts/*.md`, `.ai/prompts/*.md`, `.claude/commands/*.md`, `.gemini/commands/*.md` | Prompt/command files | On-demand |
-| `.github/agents/*`, `.ai/agents/*`, `.claude/agents/*`, `.gemini/agents/*` | Agent definitions | Conditional |
+| `agents/*`, `.github/agents/*`, `.ai/agents/*`, `.claude/agents/*`, `.gemini/agents/*` | Agent definitions | Conditional |
 | `.cursorrules`, `.cursor/rules/*.mdc`, `.windsurfrules`, `.windsurf/rules/*`, `.clinerules`, `.cline/rules/*`, `.roo/rules/*`, `.ai/rules/*` | Rule files | Always/conditional |
 | MCP configs (`mcp.json`, `.mcp.json`, `.vscode/mcp.json`, `.claude/mcp.json`, `.gemini/mcp.json`, `.ai/mcp.json`) | Tool/server configs | Conditional |
 | `.vscode/settings.json`, `.cursor/settings.json`, `.claude/settings*.json`, `.gemini/settings.json`, `.aider.conf.yml`, `.aiderignore` | Editor/CLI settings | Conditional |
@@ -99,6 +99,8 @@ Common analyze options:
   --require-level <n>         require CATES Level 1, 2, or 3
   --fail-on <list>            e.g. critical,high
   --max-always-loaded <n>     token budget gate
+  --files <list>              comma-separated relative files to analyze
+  --individual                score each --files entry separately
   --fix / --fix-dry-run       safe mechanical fixes
 ```
 

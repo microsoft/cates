@@ -9,6 +9,7 @@ import { analyzeConflicts } from './conflicts.js';
 import { analyzePrompts, analyzeMcp, analyzeSetupSteps, analyzeHooks, analyzeEditorConfig } from './components.js';
 import { calculateScore } from '../scoring/calculator.js';
 import { generateRecommendations } from '../scoring/recommendations.js';
+import { calculateSavings } from '../scoring/savings.js';
 
 /**
  * Main analysis orchestrator.
@@ -82,12 +83,14 @@ export async function analyze(rawOptions: Partial<AnalyzerOptions> & { repoPath:
 
   // Phase 4: Recommendations (prioritized, actionable)
   const recommendations = generateRecommendations(allFindings, discovery, options);
+  const savings = calculateSavings(score, discovery, recommendations, options);
 
   return {
     repoPath: options.repoPath,
     timestamp: new Date().toISOString(),
     discovery,
     score,
+    savings,
     findings: allFindings,
     recommendations,
   };

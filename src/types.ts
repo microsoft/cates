@@ -40,8 +40,21 @@ export interface Score {
   dimensions: DimensionScore[];
   totalFindings: number;
   criticalCount: number;
+  estimatedTokenWaste: number; // avoidable tokens per invocation
+  estimatedTokenSavingsPercentage: number; // percent of analyzed active config tokens
   estimatedMonthlyTokenWaste: number;
   estimatedMonthlyCostWaste: number; // USD at avg model price
+}
+
+export interface SavingsEstimate {
+  conservativeTokensPerInvocation: number;
+  conservativePercentage: number;
+  projectedTokensPerInvocation: number;
+  projectedPercentage: number;
+  projectedMonthlyTokens: number;
+  projectedMonthlyCost: number;
+  projectedAnnualTokens: number;
+  projectedAnnualCost: number;
 }
 
 // ─── Discovery Types ─────────────────────────────────────────────────────────
@@ -88,6 +101,7 @@ export interface AnalysisResult {
   timestamp: string;
   discovery: DiscoveryResult;
   score: Score;
+  savings: SavingsEstimate;
   findings: Finding[];
   recommendations: Recommendation[];
 }
@@ -97,6 +111,8 @@ export interface Recommendation {
   title: string;
   description: string;
   tokenSavings: number;
+  tokenSavingsPercentage?: number; // percent of analyzed active config tokens
+  tokenSavingsKind?: 'direct' | 'projected';
   costSavings: number; // USD/month estimated
   effort: 'trivial' | 'easy' | 'moderate' | 'significant';
   before?: string;
@@ -112,6 +128,7 @@ export const AnalyzerOptionsSchema = z.object({
   maxFileSize: z.number().default(100_000), // 100KB max per file
   maxFiles: z.number().default(50),
   maxDepth: z.number().default(5),
+  includeFiles: z.array(z.string()).optional(),
   assumedDailyInvocations: z.number().default(50), // for cost modeling
   assumedModelCostPer1kTokens: z.number().default(0.01), // avg blended
 });

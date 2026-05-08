@@ -54,12 +54,14 @@ function toPretty(result: AnalysisResult): string {
   }
   lines.push('');
 
-  // Cost Impact
-  if (score.estimatedMonthlyTokenWaste > 0) {
-    lines.push('  💰 Estimated Monthly Waste:');
-    lines.push(`     ${score.estimatedMonthlyTokenWaste.toLocaleString()} tokens/month wasted`);
-    lines.push(`     ~$${score.estimatedMonthlyCostWaste.toFixed(2)}/month in unnecessary token spend`);
-    lines.push('');
+  // Token savings impact
+  if (discovery.totalTokens > 0) {
+   lines.push('  💰 Potential Token Savings:');
+   lines.push(`     Conservative: ~${result.savings.conservativeTokensPerInvocation.toLocaleString()} tokens/invocation (${formatPercent(result.savings.conservativePercentage)} of analyzed tokens)`);
+   lines.push(`     Projected:    ~${result.savings.projectedTokensPerInvocation.toLocaleString()} tokens/invocation (${formatPercent(result.savings.projectedPercentage)} equivalent)`);
+   lines.push(`     Monthly:      ${result.savings.projectedMonthlyTokens.toLocaleString()} tokens | ~$${result.savings.projectedMonthlyCost.toFixed(2)}`);
+   lines.push(`     Annualized:   ${result.savings.projectedAnnualTokens.toLocaleString()} tokens | ~$${result.savings.projectedAnnualCost.toFixed(2)}`);
+   lines.push('');
   }
 
   // Findings Summary
@@ -101,7 +103,8 @@ function toPretty(result: AnalysisResult): string {
       lines.push(`     ${rec.priority}. ${rec.title}`);
       lines.push(`        ${rec.description}`);
       if (rec.tokenSavings > 0) {
-        lines.push(`        Savings: ~${rec.tokenSavings} tokens/invocation | ~$${rec.costSavings.toFixed(2)}/month`);
+        const savingsLabel = rec.tokenSavingsKind === 'projected' ? 'Projected savings' : 'Savings';
+        lines.push(`        ${savingsLabel}: ~${rec.tokenSavings} tokens/invocation (${formatPercent(rec.tokenSavingsPercentage ?? 0)} equivalent) | ~$${rec.costSavings.toFixed(2)}/month`);
       }
       lines.push(`        Effort: ${rec.effort}`);
       if (rec.before && rec.after) {
@@ -168,6 +171,10 @@ function sarifLevel(severity: string): string {
 function progressBar(value: number, width = 20): string {
   const filled = Math.round((value / 100) * width);
   return '█'.repeat(filled) + '░'.repeat(width - filled);
+}
+
+function formatPercent(value: number): string {
+  return `${value.toFixed(1)}%`;
 }
 
 function padRight(str: string, len: number): string {

@@ -110,6 +110,17 @@ describe('CATES Analyzer', () => {
       expect(result.discovery.totalTokens).toBeGreaterThan(100);
       expect(result.discovery.alwaysLoadedTokens).toBeGreaterThan(0);
     });
+
+    it('limits discovery to explicitly included files', async () => {
+      const result = await analyze({
+        repoPath: resolve(FIXTURES, 'ecosystem'),
+        includeFiles: ['agents/migration.md'],
+      });
+
+      expect(result.discovery.files).toHaveLength(1);
+      expect(result.discovery.files[0]!.relativePath).toBe('agents/migration.md');
+      expect(result.discovery.files[0]!.type).toBe('agent-definition');
+    });
   });
 
   describe('Full config fixture (all components)', () => {
@@ -165,6 +176,7 @@ describe('CATES Analyzer', () => {
       expect(paths).toContain('.claude/settings.json');
       expect(paths).toContain('.claude/commands/review.md');
       expect(paths).toContain('.claude/agents/security.md');
+      expect(paths).toContain('agents/migration.md');
       expect(paths).toContain('.cursor/rules/typescript.mdc');
       expect(paths).toContain('.windsurfrules');
       expect(paths).toContain('.aider.conf.yml');
@@ -189,6 +201,8 @@ describe('CATES Analyzer', () => {
       const { createReport } = await import('../src/scoring/report.js');
       const json = createReport(result, 'json');
       expect(() => JSON.parse(json)).not.toThrow();
+      expect(JSON.parse(json).score).toHaveProperty('estimatedTokenSavingsPercentage');
+      expect(JSON.parse(json).savings).toHaveProperty('projectedAnnualTokens');
     });
 
     it('produces valid SARIF output', async () => {
@@ -207,6 +221,8 @@ describe('CATES Analyzer', () => {
       const pretty = createReport(result, 'pretty');
       expect(pretty).toContain('Overall Score');
       expect(pretty).toContain('Dimension Scores');
+      expect(pretty).toContain('Potential Token Savings');
+      expect(pretty).toContain('Annualized');
     });
   });
 

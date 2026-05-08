@@ -145,7 +145,7 @@ export function generateRecommendations(
       priority: 3,
       title: '⚡ Resolve contradictory instructions',
       description: `${contradictions.length} contradiction(s) detected. These cause unpredictable agent behavior and wasted retry sessions.`,
-      tokenSavings: 0,
+      tokenSavings: projectedSavings(2000, 0.2),
       costSavings: estimateMonthlyCost({
         tokenCount: 2000, // estimated waste from retries due to confusion
         dailyInvocations: Math.round(options.assumedDailyInvocations * 0.2), // 20% of invocations confused
@@ -162,7 +162,7 @@ export function generateRecommendations(
       priority: 8,
       title: '📝 Add missing instruction topics',
       description: `${missingTopics.length} essential topics are not covered: ${missingTopics.map(f => f.message.replace('Missing topic: ', '').split('.')[0]).join(', ')}. Gaps cause agents to guess (poorly) or ask for clarification (wasting roundtrips).`,
-      tokenSavings: 0,
+      tokenSavings: projectedSavings(1000, 0.3),
       costSavings: estimateMonthlyCost({
         tokenCount: 1000,
         dailyInvocations: Math.round(options.assumedDailyInvocations * 0.3),
@@ -201,7 +201,7 @@ export function generateRecommendations(
       priority: 7,
       title: '🏷️ Add purpose headers to prompt files',
       description: `${purposelessPrompts.length} prompt file(s) lack a clear purpose/trigger description. Without this, users and agents can't determine when to invoke them — leading to misuse or non-use.`,
-      tokenSavings: 0,
+      tokenSavings: projectedSavings(200, 0.1),
       costSavings: estimateMonthlyCost({
         tokenCount: 200, // wasted tokens from wrong prompt being invoked
         dailyInvocations: Math.round(options.assumedDailyInvocations * 0.1),
@@ -239,7 +239,7 @@ export function generateRecommendations(
       priority: 6,
       title: '📖 Add descriptions to MCP server configs',
       description: `${mcpNoDesc.length} MCP server(s) lack descriptions. Agents use descriptions to decide which tools to invoke — without them, agents may call wrong tools or skip useful ones, wasting roundtrips.`,
-      tokenSavings: 0,
+      tokenSavings: projectedSavings(500, 0.15),
       costSavings: estimateMonthlyCost({
         tokenCount: 500, // wasted tokens from incorrect tool calls
         dailyInvocations: Math.round(options.assumedDailyInvocations * 0.15),
@@ -320,7 +320,7 @@ export function generateRecommendations(
       priority: 5,
       title: '🧪 Configure test framework in setup steps',
       description: 'Coding agent setup doesn\'t install a test runner. Without tests, the agent can\'t verify its changes — leading to more iteration cycles and wasted tokens.',
-      tokenSavings: 0,
+      tokenSavings: projectedSavings(3000, 0.3),
       costSavings: estimateMonthlyCost({
         tokenCount: 3000, // extra roundtrips when agent can't self-verify
         dailyInvocations: Math.round(options.assumedDailyInvocations * 0.3),
@@ -337,7 +337,7 @@ export function generateRecommendations(
       priority: 4,
       title: '🤖 Make hooks non-interactive for agent compatibility',
       description: `${interactiveHooks.length} hook(s) may require user input. When triggered by automated agent workflows, these block indefinitely — wasting compute and failing silently.`,
-      tokenSavings: 0,
+      tokenSavings: projectedSavings(2000, 0.1),
       costSavings: estimateMonthlyCost({
         tokenCount: 2000, // wasted on blocked session
         dailyInvocations: Math.round(options.assumedDailyInvocations * 0.1),
@@ -381,5 +381,21 @@ export function generateRecommendations(
     });
   }
 
-  return recommendations.sort((a, b) => a.priority - b.priority);
+  return recommendations
+    .sort((a, b) => a.priority - b.priority)
+    .map(rec => ({
+      ...rec,
+      tokenSavingsPercentage: discovery.totalTokens > 0
+        ? Math.round((rec.tokenSavings / discovery.totalTokens) * 1000) / 10
+        : 0,
+      tokenSavingsKind: rec.tokenSavings > 0 && !hasDirectTokenImpact(rec.title) ? 'projected' : 'direct',
+    }));
+}
+
+function projectedSavings(tokensPerAffectedInvocation: number, affectedInvocationRate: number): number {
+  return Math.round(tokensPerAffectedInvocation * affectedInvocationRate);
+}
+
+function hasDirectTokenImpact(title: string): boolean {
+  return /Deduplicate|Replace inline|verbosity|generic filler|always-loaded|negative constraints|Split oversized/i.test(title);
 }

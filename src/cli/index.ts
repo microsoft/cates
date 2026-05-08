@@ -10,7 +10,7 @@ import { applySafeFixes } from '../autofix.js';
 import { getRule, RULE_CATALOG, rulesAsJson } from '../rules/catalog.js';
 import { scanPortfolio } from '../portfolio.js';
 import { resolveReviewSource } from '../sources.js';
-import type { Severity } from '../types.js';
+import type { AnalysisResult, Severity } from '../types.js';
 
 program
   .name('cates-analyzer')
@@ -27,6 +27,8 @@ program
   .option('--cost <n>', 'Cost per 1k tokens (USD) for cost modeling')
   .option('--max-files <n>', 'Maximum config files to analyze', '50')
   .option('--max-depth <n>', 'Maximum directory traversal depth', '5')
+  .option('--files <list>', 'Comma-separated relative file paths to analyze instead of auto-discovery')
+  .option('--individual', 'Analyze each --files entry separately')
   .option('--no-evidence', 'Omit evidence snippets from output')
   .option('--min-score <n>', 'Fail if score is below this value')
   .option('--require-level <n>', 'Fail unless CATES conformance level is at least 1, 2, or 3')
@@ -46,6 +48,8 @@ program
   .option('--cost <n>', 'Cost per 1k tokens (USD) for cost modeling')
   .option('--max-files <n>', 'Maximum config files to analyze', '50')
   .option('--max-depth <n>', 'Maximum directory traversal depth', '5')
+  .option('--files <list>', 'Comma-separated relative file paths to analyze instead of auto-discovery')
+  .option('--individual', 'Analyze each --files entry separately')
   .option('--no-evidence', 'Omit evidence snippets from output')
   .option('--min-score <n>', 'Fail if score is below this value')
   .option('--require-level <n>', 'Fail unless CATES conformance level is at least 1, 2, or 3')
@@ -129,15 +133,31 @@ async function runAnalyze(path: string, opts: Record<string, unknown>): Promise<
 
 async function executeAnalyze(repoPath: string, opts: Record<string, unknown>, displayPath?: string): Promise<number> {
   const policy = await loadPolicy(repoPath, stringOpt(opts.policy));
-  const result = await analyze({
-    repoPath,
-    outputFormat: formatOpt(opts.format),
-    includeEvidence: opts.evidence !== false,
-    assumedDailyInvocations: numberOpt(opts.invocations) ?? policy.assumedDailyInvocations ?? 50,
-    assumedModelCostPer1kTokens: numberOpt(opts.cost) ?? policy.assumedModelCostPer1kTokens ?? 0.01,
-    maxFiles: numberOpt(opts.maxFiles) ?? 50,
-    maxDepth: numberOpt(opts.maxDepth) ?? 5,
-  });
+  const includeFiles = fileListOpt(opts.files);
+  const format = formatOpt(opts.format);
+
+  if (opts.individual) {
+    if (includeFiles.length === 0) throw new Error('--individual requires --files');
+    if (format === 'sarif') throw new Error('--individual is only supported with pretty or json output');
+    if (opts.fix || opts.fixDryRun) throw new Error('--individual cannot be combined with --fix or --fix-dry-run');
+
+    const results: AnalysisResult[] = [];
+    let exitCode = 0;
+    for (const includeFile of includeFiles) {
+      const result = await analyze(buildAnalyzeOptions(repoPath, opts, policy, [includeFile]));
+      results.push(withDisplayPath(result, displayPathFor(repoPath, displayPath, includeFile)));
+      exitCode ||= evaluateResultGates(result, policy, opts);
+    }
+
+    if (format === 'json') {
+      process.stdout.write(JSON.stringify(results, null, 2) + '\n');
+    } else {
+      process.stdout.write(results.map(result => createReport(result, format)).join('\n') + '\n');
+    }
+    return exitCode;
+  }
+
+  const result = await analyze(buildAnalyzeOptions(repoPath, opts, policy, includeFiles));
 
   if (opts.fix || opts.fixDryRun) {
     const fixResult = await applySafeFixes(result, Boolean(opts.fixDryRun));
@@ -146,8 +166,30 @@ async function executeAnalyze(repoPath: string, opts: Record<string, unknown>, d
   }
 
   const reportResult = displayPath ? { ...result, repoPath: displayPath } : result;
-  process.stdout.write(createReport(reportResult, formatOpt(opts.format)) + '\n');
+  process.stdout.write(createReport(reportResult, format) + '\n');
 
+  return evaluateResultGates(result, policy, opts);
+}
+
+function buildAnalyzeOptions(
+  repoPath: string,
+  opts: Record<string, unknown>,
+  policy: CatesPolicy,
+  includeFiles: string[],
+): Parameters<typeof analyze>[0] {
+  return {
+    repoPath,
+    outputFormat: formatOpt(opts.format),
+    includeEvidence: opts.evidence !== false,
+    assumedDailyInvocations: numberOpt(opts.invocations) ?? policy.assumedDailyInvocations ?? 50,
+    assumedModelCostPer1kTokens: numberOpt(opts.cost) ?? policy.assumedModelCostPer1kTokens ?? 0.01,
+    maxFiles: numberOpt(opts.maxFiles) ?? 50,
+    maxDepth: numberOpt(opts.maxDepth) ?? 5,
+    includeFiles: includeFiles.length > 0 ? includeFiles : undefined,
+  };
+}
+
+function evaluateResultGates(result: AnalysisResult, policy: CatesPolicy, opts: Record<string, unknown>): number {
   const gatePolicy: CatesPolicy = {
     minScore: numberOpt(opts.minScore),
     requireLevel: parseLevelOpt(opts.requireLevel),
@@ -160,6 +202,14 @@ async function executeAnalyze(repoPath: string, opts: Record<string, unknown>, d
     return 1;
   }
   return 0;
+}
+
+function withDisplayPath(result: AnalysisResult, repoPath: string): AnalysisResult {
+  return { ...result, repoPath };
+}
+
+function displayPathFor(repoPath: string, displayPath: string | undefined, includeFile: string): string {
+  return `${displayPath ?? repoPath}:${includeFile}`;
 }
 
 async function runReview(source: string, opts: Record<string, unknown>): Promise<void> {
@@ -209,6 +259,14 @@ function numberOpt(value: unknown): number | undefined {
 
 function stringOpt(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
+}
+
+function fileListOpt(value: unknown): string[] {
+  if (typeof value !== 'string') return [];
+  return value
+    .split(',')
+    .map(file => file.trim())
+    .filter(file => file.length > 0);
 }
 
 function formatOpt(value: unknown): 'pretty' | 'json' | 'sarif' {

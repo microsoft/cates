@@ -20,7 +20,7 @@ const SEVERITY_DEDUCTIONS: Record<string, number> = {
 
 export function calculateScore(
   findings: Finding[],
-  _discovery: DiscoveryResult,
+  discovery: DiscoveryResult,
   options: AnalyzerOptions,
 ): Score {
   const dimensions: DimensionScore[] = [];
@@ -57,6 +57,9 @@ export function calculateScore(
     .reduce((sum, f) => sum + (f.tokenImpact ?? 0), 0);
 
   const estimatedMonthlyTokenWaste = tokenWaste * options.assumedDailyInvocations * 22;
+  const estimatedTokenSavingsPercentage = discovery.totalTokens > 0
+    ? roundPercent((tokenWaste / discovery.totalTokens) * 100)
+    : 0;
   const estimatedMonthlyCostWaste = estimateMonthlyCost({
     tokenCount: tokenWaste,
     dailyInvocations: options.assumedDailyInvocations,
@@ -69,9 +72,15 @@ export function calculateScore(
     dimensions,
     totalFindings: findings.length,
     criticalCount,
+    estimatedTokenWaste: tokenWaste,
+    estimatedTokenSavingsPercentage,
     estimatedMonthlyTokenWaste,
     estimatedMonthlyCostWaste,
   };
+}
+
+function roundPercent(value: number): number {
+  return Math.round(value * 10) / 10;
 }
 
 function getGrade(score: number): Score['grade'] {

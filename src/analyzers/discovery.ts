@@ -36,6 +36,7 @@ const CONFIG_PATTERNS: Array<{ pattern: RegExp; type: ConfigType; scope: ConfigS
   { pattern: /^\.github\/copilot-chat\.ya?ml$/i, type: 'chat-config', scope: 'conditional' },
   { pattern: /^\.ai\/chat\.ya?ml$/i, type: 'chat-config', scope: 'conditional' },
   // Conditional: Custom agent definitions
+  { pattern: /^agents\/.*\.(ya?ml|md)$/i, type: 'agent-definition', scope: 'conditional' },
   { pattern: /^\.github\/agents\/.*\.(ya?ml|md)$/i, type: 'agent-definition', scope: 'conditional' },
   { pattern: /^\.ai\/agents\/.*\.(ya?ml|md)$/i, type: 'agent-definition', scope: 'conditional' },
   { pattern: /^\.claude\/agents\/.*\.md$/i, type: 'agent-definition', scope: 'conditional' },
@@ -85,10 +86,75 @@ const CONFIG_PATTERNS: Array<{ pattern: RegExp; type: ConfigType; scope: ConfigS
   { pattern: /^\.aider\..*$/i, type: 'extension-config', scope: 'conditional' },
 ];
 
+type FileClassification = { type: ConfigType; scope: ConfigScope };
+
 export async function discoverFiles(options: AnalyzerOptions): Promise<DiscoveryResult> {
   const repoRoot = resolve(options.repoPath);
   const files: DiscoveredFile[] = [];
   let filesScanned = 0;
+
+  async function addFile(fullPath: string, relativePath: string, match: FileClassification): Promise<void> {
+    filesScanned++;
+
+    // Security: enforce size limit
+    const fileStat = await stat(fullPath);
+    if (fileStat.size > options.maxFileSize) {
+      files.push({
+        path: fullPath,
+        relativePath,
+        type: match.type,
+        scope: match.scope,
+        sizeBytes: fileStat.size,
+        tokenCount: 0,
+        isActive: false, // too large = likely not a real config
+      });
+      return;
+    }
+
+    // Security: skip binary files
+    const content = await readFile(fullPath, 'utf-8');
+    if (isBinary(content)) return;
+
+    const tokenCount = countTokens(content);
+
+    files.push({
+      path: fullPath,
+      relativePath,
+      type: match.type,
+      scope: match.scope,
+      sizeBytes: fileStat.size,
+      tokenCount,
+      isActive: true,
+    });
+  }
+
+  async function discoverIncludedFiles(includeFiles: string[]): Promise<void> {
+    if (includeFiles.length > options.maxFiles) {
+      throw new Error(`--files listed ${includeFiles.length} files, exceeding --max-files ${options.maxFiles}`);
+    }
+
+    const realRepoRoot = await realpath(repoRoot);
+
+    for (const includeFile of includeFiles) {
+      const fullPath = resolve(repoRoot, includeFile);
+      const realFilePath = await realpath(fullPath);
+      if (realFilePath !== realRepoRoot && !realFilePath.startsWith(`${realRepoRoot}/`)) {
+        throw new Error(`Included file escapes repository boundary: ${includeFile}`);
+      }
+
+      const fileStat = await stat(realFilePath);
+      if (!fileStat.isFile()) {
+        throw new Error(`Included path must be a file: ${includeFile}`);
+      }
+
+      const relativePath = relative(realRepoRoot, realFilePath).split('\\').join('/');
+      const match = CONFIG_PATTERNS.find(p => p.pattern.test(relativePath)) ?? {
+        type: 'unknown' as const,
+        scope: 'conditional' as const,
+      };
+      await addFile(realFilePath, relativePath, match);
+    }
+  }
 
   async function walk(dir: string, depth: number): Promise<void> {
     if (depth > options.maxDepth) return;
@@ -127,46 +193,19 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
 
       if (!entry.isFile()) continue;
 
-      const relativePath = relative(repoRoot, fullPath);
+      const relativePath = relative(repoRoot, fullPath).split('\\').join('/');
       const match = CONFIG_PATTERNS.find(p => p.pattern.test(relativePath));
       if (!match) continue;
 
-      filesScanned++;
-
-      // Security: enforce size limit
-      const fileStat = await stat(fullPath);
-      if (fileStat.size > options.maxFileSize) {
-        files.push({
-          path: fullPath,
-          relativePath,
-          type: match.type,
-          scope: match.scope,
-          sizeBytes: fileStat.size,
-          tokenCount: 0,
-          isActive: false, // too large = likely not a real config
-        });
-        continue;
-      }
-
-      // Security: skip binary files
-      const content = await readFile(fullPath, 'utf-8');
-      if (isBinary(content)) continue;
-
-      const tokenCount = countTokens(content);
-
-      files.push({
-        path: fullPath,
-        relativePath,
-        type: match.type,
-        scope: match.scope,
-        sizeBytes: fileStat.size,
-        tokenCount,
-        isActive: true,
-      });
+      await addFile(fullPath, relativePath, match);
     }
   }
 
-  await walk(repoRoot, 0);
+  if (options.includeFiles?.length) {
+    await discoverIncludedFiles(options.includeFiles);
+  } else {
+    await walk(repoRoot, 0);
+  }
 
   const activeFiles = files.filter(f => f.isActive);
   const alwaysLoadedTokens = activeFiles
