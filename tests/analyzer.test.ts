@@ -10,6 +10,7 @@ import { spawnSync } from 'node:child_process';
 
 const FIXTURES = resolve(import.meta.dirname, '../fixtures');
 const REPO_ROOT = resolve(import.meta.dirname, '..');
+const TSX_CLI = resolve(REPO_ROOT, 'node_modules/tsx/dist/cli.mjs');
 
 describe('CATES Analyzer', () => {
   describe('Bad config fixture', () => {
@@ -321,7 +322,7 @@ describe('CATES Analyzer', () => {
     });
 
     it('fails clearly on invalid CLI formats', () => {
-      const result = spawnSync('npx', ['tsx', 'src/cli/index.ts', 'fixtures/good', '--format', 'xml'], {
+      const result = spawnSync(process.execPath, [TSX_CLI, 'src/cli/index.ts', 'fixtures/good', '--format', 'xml'], {
         cwd: REPO_ROOT,
         encoding: 'utf-8',
       });
@@ -338,7 +339,7 @@ describe('CATES Analyzer', () => {
     });
 
     it('fails clearly on invalid demo categories', () => {
-      const result = spawnSync('npx', ['tsx', 'src/cli/index.ts', 'demo', '--category', 'bogus', '--limit', '1'], {
+      const result = spawnSync(process.execPath, [TSX_CLI, 'src/cli/index.ts', 'demo', '--category', 'bogus', '--limit', '1'], {
         cwd: REPO_ROOT,
         encoding: 'utf-8',
       });
