@@ -1,0 +1,23 @@
+{{- if .Values.policy.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cates.fullname" . }}-policy
+  labels:
+    {{- include "cates.labels" . | nindent 4 }}
+data:
+  policy.yml: |
+    {{- .Values.policy.content | nindent 4 }}
+{{- end }}
+{{- if .Values.repos.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cates.fullname" . }}-repos
+  labels:
+    {{- include "cates.labels" . | nindent 4 }}
+data:
+  repos.txt: |
+    {{- .Values.repos.content | nindent 4 }}
+{{- end }}

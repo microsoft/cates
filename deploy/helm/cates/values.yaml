@@ -1,0 +1,122 @@
+# Default values for the cates Helm chart.
+# Most users only need to override `args`, `image.tag`, and `githubToken`.
+
+# Workload mode: "cronjob" (scheduled) or "job" (one-shot).
+mode: cronjob
+
+image:
+  repository: ghcr.io/msfttoler/cates
+  tag: ""              # defaults to .Chart.AppVersion when empty
+  pullPolicy: IfNotPresent
+  pullSecrets: []      # [{ name: ghcr-creds }]
+
+# Arguments passed to the cates-analyzer CLI.
+# Examples:
+#   ["demo", "--category", "microsoft", "--limit", "25", "--format", "json"]
+#   ["review", "https://github.com/owner/repo", "--format", "sarif"]
+args:
+  - "demo"
+  - "--limit"
+  - "10"
+  - "--format"
+  - "json"
+
+# CronJob schedule (only used when mode=cronjob). 6 AM UTC daily.
+schedule: "0 6 * * *"
+concurrencyPolicy: Forbid
+successfulJobsHistoryLimit: 3
+failedJobsHistoryLimit: 1
+startingDeadlineSeconds: 600
+suspend: false
+
+# Job-level controls (apply to both modes).
+job:
+  backoffLimit: 1
+  activeDeadlineSeconds: 3600
+  ttlSecondsAfterFinished: 86400
+  restartPolicy: Never
+  parallelism: 1
+  completions: 1
+
+# GitHub auth. Provide ONE of:
+#   1) githubToken.value            - raw token (creates a Secret; fine for dev)
+#   2) githubToken.existingSecret   - reference an existing Secret + key
+#   3) githubToken.workloadIdentity - use AKS Workload Identity (no token)
+githubToken:
+  value: ""
+  existingSecret: ""
+  existingSecretKey: "token"
+  workloadIdentity:
+    enabled: false
+    clientId: ""       # Entra app client ID federated to the ServiceAccount
+    tenantId: ""
+
+# Optional: inline .cates.yml policy mounted at /etc/cates/policy.yml.
+# Reference it from args: ["--policy", "/etc/cates/policy.yml", ...]
+policy:
+  enabled: false
+  content: |
+    # See https://github.com/msfttoler/cates for the policy schema.
+    version: 1
+    severityThreshold: high
+
+# Optional: list of repositories for `demo --repos-file`.
+# Mounted at /etc/cates/repos.txt.
+repos:
+  enabled: false
+  content: ""          # newline-separated GitHub URLs
+
+# Optional persistent storage for reports. When disabled the container
+# writes to an emptyDir that is discarded after the Job completes.
+reports:
+  persistence:
+    enabled: false
+    existingClaim: ""
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 1Gi
+  mountPath: /work/reports
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}      # populated automatically when workloadIdentity.enabled
+
+podLabels: {}
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 2000m
+    memory: 1Gi
+
+env: []                # extra env vars, list of { name, value } or { name, valueFrom }
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Network egress to github.com is required. If your cluster runs a default-deny
+# NetworkPolicy, enable this to allow the analyzer pod to reach external HTTPS.
+networkPolicy:
+  enabled: false
+  egressPorts:
+    - port: 443
+      protocol: TCP

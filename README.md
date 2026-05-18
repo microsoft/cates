@@ -37,6 +37,66 @@ npx tsx src/cli/index.ts review https://github.com/OWNER/REPO
 
 Do not run `tsc review ...` or `npm run typecheck -- review ...`; those commands invoke the TypeScript compiler and it will treat `review` and the URL as files to compile.
 
+## 🐳 Docker
+
+A small, non-root Alpine image is the easiest way to get a consistent
+toolchain across Windows, macOS, and Linux (plus the right `git` and `gh`
+versions baked in).
+
+```bash
+# Build locally
+docker build -t cates-analyzer .
+
+# Analyze the current directory (bind-mount it as /work)
+docker run --rm -v "$PWD:/work" cates-analyzer .
+
+# Review a public repo
+docker run --rm cates-analyzer review https://github.com/OWNER/REPO
+
+# Review a private repo (token never written to disk)
+docker run --rm -e GH_TOKEN cates-analyzer review https://github.com/OWNER/REPO
+
+# JSON to stdout, piped into your tooling
+docker run --rm -v "$PWD:/work" cates-analyzer . --format json > report.json
+```
+
+Windows PowerShell users substitute `${PWD}` for `$PWD`.
+
+The image runs as a non-root user, uses a read-only root filesystem, and
+ships with `tini` as PID 1 so it behaves cleanly under Kubernetes/ACA.
+
+## ☸️ Kubernetes / AKS (Helm chart)
+
+The chart in [`deploy/helm/cates`](deploy/helm/cates/README.md) deploys
+CATES as a `CronJob` (default) or one-shot `Job`. It supports AKS
+Workload Identity, NetworkPolicies, a persistent reports volume, and a
+ConfigMap-mounted `.cates.yml` policy.
+
+```bash
+helm install cates ./deploy/helm/cates \
+  -n cates --create-namespace \
+  --set image.tag=1.0.0 \
+  --set githubToken.value=$GH_TOKEN \
+  --set-json 'args=["demo","--limit","25","--format","json"]'
+```
+
+See [`deploy/helm/cates/README.md`](deploy/helm/cates/README.md) for
+production values, Workload Identity setup, and PVC-backed reports.
+
+## ☁️ Azure Container Apps
+
+For a server-less, no-cluster deployment, run CATES as an **ACA Job**:
+
+```bash
+az deployment group create \
+  -g rg-cates \
+  -f deploy/aca/cates-job.bicep \
+  -p image=ghcr.io/msfttoler/cates:1.0.0 githubToken=$GH_TOKEN
+```
+
+Schedule, manual, and event-triggered modes are all supported. Full
+walkthrough in [`deploy/aca/README.md`](deploy/aca/README.md).
+
 ## 📊 What It Scores
 
 | Dimension | Weight | What It Checks |

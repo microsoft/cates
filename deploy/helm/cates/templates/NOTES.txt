@@ -1,0 +1,29 @@
+CATES has been installed as release {{ .Release.Name }} in namespace {{ .Release.Namespace }}.
+
+Mode: {{ .Values.mode }}
+Image: {{ include "cates.image" . }}
+
+{{- if eq .Values.mode "cronjob" }}
+
+Schedule: {{ .Values.schedule }}
+
+Tail the next run with:
+  kubectl -n {{ .Release.Namespace }} get cronjob {{ include "cates.fullname" . }} -w
+
+Trigger an ad-hoc run:
+  kubectl -n {{ .Release.Namespace }} create job --from=cronjob/{{ include "cates.fullname" . }} {{ include "cates.fullname" . }}-manual-$(date +%s)
+{{- else }}
+
+Watch this Job:
+  kubectl -n {{ .Release.Namespace }} logs job/{{ include "cates.fullname" . }} -f
+{{- end }}
+
+{{- if and .Values.githubToken.workloadIdentity.enabled (not .Values.githubToken.value) (not .Values.githubToken.existingSecret) }}
+
+Workload Identity is enabled. Make sure you have:
+  1. Created the federated credential on Entra app {{ .Values.githubToken.workloadIdentity.clientId }}
+     bound to subject system:serviceaccount:{{ .Release.Namespace }}:{{ include "cates.serviceAccountName" . }}
+  2. Granted the identity permission to mint a GitHub App / installation token,
+     and added an init step (or use `gh auth login --with-token`) so the
+     analyzer's GH_TOKEN env is populated at runtime.
+{{- end }}

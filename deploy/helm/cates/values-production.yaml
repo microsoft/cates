@@ -1,0 +1,33 @@
+# Custom values for opinionated production CronJob.
+mode: cronjob
+schedule: "0 6 * * 1-5"   # weekdays 06:00 UTC
+
+image:
+  repository: ghcr.io/msfttoler/cates
+  tag: "1.0.0"
+
+args:
+  - "demo"
+  - "--category"
+  - "microsoft,github"
+  - "--limit"
+  - "50"
+  - "--format"
+  - "json"
+
+githubToken:
+  existingSecret: cates-gh
+  existingSecretKey: token
+
+resources:
+  requests: { cpu: 250m, memory: 512Mi }
+  limits:   { cpu: 2,    memory: 2Gi }
+
+networkPolicy:
+  enabled: true
+
+reports:
+  persistence:
+    enabled: true
+    storageClass: managed-csi
+    size: 5Gi

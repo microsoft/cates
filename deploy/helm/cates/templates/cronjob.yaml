@@ -1,0 +1,36 @@
+{{- if eq .Values.mode "cronjob" }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "cates.fullname" . }}
+  labels:
+    {{- include "cates.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  suspend: {{ .Values.suspend }}
+  concurrencyPolicy: {{ .Values.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.failedJobsHistoryLimit }}
+  startingDeadlineSeconds: {{ .Values.startingDeadlineSeconds }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.job.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.job.activeDeadlineSeconds }}
+      ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+      parallelism: {{ .Values.job.parallelism }}
+      completions: {{ .Values.job.completions }}
+      template:
+        metadata:
+          labels:
+            {{- include "cates.selectorLabels" . | nindent 12 }}
+            {{- with .Values.podLabels }}{{ toYaml . | nindent 12 }}{{- end }}
+            {{- if .Values.githubToken.workloadIdentity.enabled }}
+            azure.workload.identity/use: "true"
+            {{- end }}
+          {{- with .Values.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        spec:
+          {{- include "cates.podSpec" . | nindent 10 }}
+{{- end }}

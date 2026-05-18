@@ -8,3 +8,8 @@ src/**/*.d.ts.map
 *.tgz
 .env
 .DS_Store
+
+# Ad-hoc screenshots / pasted images (never commit)
+image.png
+image*.png
+"image (*).png"
