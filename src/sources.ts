@@ -98,7 +98,7 @@ async function materializeGitHubSource(
 
   try {
     if (options.preferGh !== false && await commandExists('gh')) {
-      await run('gh', ['repo', 'clone', `${link.owner}/${link.repo}`, repoPath, '--', '--depth', '1']);
+      await run('gh', ['repo', 'clone', remote, repoPath, '--', '--depth', '1']);
     } else {
       await run('git', ['clone', '--depth', '1', remote, repoPath]);
     }
