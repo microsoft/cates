@@ -209,11 +209,15 @@ docker run --rm -p 8080:8080 cates \
   node /app/dist-service/service/server.js
 ```
 
-### Deploying the service to Azure Container Apps
+### Deployment targets
 
-A sibling Bicep template deploys the service as an always-on Container
-App with scale-to-zero, TLS, and liveness/readiness probes wired to the
-service's health endpoints:
+The service is **deployable** to either Azure Container Apps or Azure App
+Service. Both targets share the same container image (so the same
+artifact runs anywhere). **No CI workflow auto-deploys** — pick a target
+and run the `az deployment group create` command yourself when you want
+a deployment to happen.
+
+#### Option A — Azure Container Apps (recommended for scale-to-zero)
 
 ```bash
 az group create -n rg-cates -l eastus2
@@ -222,28 +226,31 @@ az deployment group create -g rg-cates \
   -p image=ghcr.io/msfttoler/cates:latest
 ```
 
-The deployment outputs an HTTPS FQDN you can browse immediately.
+Scale-to-zero on idle, HTTP-concurrency autoscaling, free TLS, liveness
+and readiness probes wired to `/api/healthz` and `/api/readyz`. Full
+detail in [`deploy/aca/cates-service.bicep`](deploy/aca/cates-service.bicep).
 
-### Deploying the service to Azure Static Web Apps (public demo)
-
-For a serverless, zero-cost-when-idle public demo, deploy to **Azure
-Static Web Apps** + **Azure Functions**:
+#### Option B — Azure App Service (Web App for Containers)
 
 ```bash
-az staticwebapp create -g rg-cates -n swa-cates -l eastus2 --sku Free \
-  --source https://github.com/msfttoler/cates --branch main \
-  --login-with-github
+az group create -n rg-cates -l eastus2
+az deployment group create -g rg-cates \
+  -f deploy/appservice/cates-service.bicep \
+  -p image=ghcr.io/msfttoler/cates:latest
 ```
 
-Add the deployment token as the GitHub Actions secret
-`AZURE_STATIC_WEB_APPS_API_TOKEN` and the bundled
-[`swa-deploy.yml`](.github/workflows/swa-deploy.yml) workflow ships the
-SPA + Functions on every push to `main`. Full walkthrough in
-[`deploy/swa/README.md`](deploy/swa/README.md).
+Linux Web App on an App Service Plan (defaults to the cheapest always-on
+`B1` SKU). HTTPS-only, HTTP/2, TLS 1.2 minimum, FTPS disabled,
+`healthCheckPath` set to `/api/healthz`. Full detail in
+[`deploy/appservice/README.md`](deploy/appservice/README.md).
 
-> **Note:** `/api/scan` returns `501` on the SWA target because the
-> Functions runtime doesn't ship `git`. Use ACA (above) for repo
-> scanning, or wait for the Phase 2 `isomorphic-git` rewrite.
+#### Pick one
+
+| Pick App Service when… | Pick ACA when… |
+| --- | --- |
+| Your org already uses App Service / has an existing plan | You want true scale-to-zero on idle |
+| You need slots, Easy Auth, or App Service Environment | You want event-driven scaling on HTTP concurrency |
+| You're more comfortable with App Service operations | You prefer Container Apps' revisions model |
 
 ### Rule &amp; dimension toggles in the UI
 
@@ -290,7 +297,7 @@ score updates immediately and the result includes `disabledRuleIds` /
 | **Safe autofix** | `--fix` / `--fix-dry-run` for mechanical, reviewable changes |
 | **Token economics** | Per-finding token impact + conservative and projected savings estimates |
 | **Hardened runtime** | Sandboxed reads, argv-injection guards, size/depth limits, binary detection, no network calls in analyze mode |
-| **Multiple ship targets** | npm CLI, Docker image, Helm chart for AKS, Bicep templates for Azure Container Apps (CLI Job + Service App) |
+| **Multiple ship targets** | npm CLI, Docker image, Helm chart for AKS, Bicep templates for Azure Container Apps and Azure App Service (manual deploy — no CI auto-deploy) |
 
 ## ⚙️ Configuring CATES
 
