@@ -25,9 +25,11 @@ RUN apk add --no-cache --virtual .build-deps python3 make g++ \
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-COPY tsconfig.json ./
+COPY tsconfig.json tsconfig.service.json ./
 COPY src ./src
+COPY service ./service
 RUN npm run build \
+ && npm run build:service \
  && npm prune --omit=dev \
  && apk del .build-deps
 
@@ -50,11 +52,17 @@ WORKDIR /app
 COPY --from=build --chown=cates:cates /app/package.json /app/package.json
 COPY --from=build --chown=cates:cates /app/node_modules /app/node_modules
 COPY --from=build --chown=cates:cates /app/dist /app/dist
+COPY --from=build --chown=cates:cates /app/dist-service /app/dist-service
 COPY --chown=cates:cates README.md LICENSE CATES-v1.0.md /app/
 COPY --chown=cates:cates docs /app/docs
 
 # Drop privileges. Default WORKDIR for analysis is /work so users can
 # bind-mount their repo: `docker run --rm -v "$PWD:/work" cates .`
+#
+# This image supports two roles:
+#   1. CLI  (default ENTRYPOINT):  docker run --rm -v "$PWD:/work" cates .
+#   2. SERVICE (override CMD):     docker run -p 8080:8080 cates \
+#                                    node /app/dist-service/service/server.js
 USER cates
 WORKDIR /work
 

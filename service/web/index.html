@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>CATES Service — score your coding agent config</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0b1220;
+      --panel: #111827;
+      --panel-2: #1e293b;
+      --border: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #67e8f9;
+      --good: #4ade80;
+      --warn: #fbbf24;
+      --bad: #f87171;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    main { max-width: 1180px; margin: 0 auto; padding: 24px 20px 56px; }
+    h1 { font-size: 32px; margin: 0 0 6px; }
+    h2 { margin: 28px 0 12px; font-size: 18px; color: var(--accent-2); }
+    p.lead { color: var(--muted); margin: 0 0 16px; }
+    a { color: var(--accent); }
+
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tabs button {
+      background: var(--panel); color: var(--text); border: 1px solid var(--border);
+      padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: 14px;
+    }
+    .tabs button.active { background: var(--accent); color: #001425; border-color: var(--accent); font-weight: 600; }
+
+    .panel {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+      padding: 18px; margin-bottom: 16px;
+    }
+    label.field { display: block; margin-bottom: 12px; }
+    label.field span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    input[type=text], select, textarea {
+      width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 12px; font-size: 14px; font-family: inherit;
+    }
+    textarea { min-height: 280px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; resize: vertical; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+    .row > label.field { flex: 1 1 220px; }
+    button.primary {
+      background: var(--accent); color: #001425; border: 0; padding: 10px 18px;
+      border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 14px;
+    }
+    button.primary:disabled { opacity: 0.6; cursor: progress; }
+    button.ghost {
+      background: transparent; color: var(--text); border: 1px solid var(--border);
+      padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px;
+    }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .card {
+      background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+    }
+    .card .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .card .value { font-size: 32px; font-weight: 800; line-height: 1.1; }
+    .card .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    .grade-A, .grade-Aplus { color: var(--good); }
+    .grade-B { color: var(--accent-2); }
+    .grade-C { color: var(--warn); }
+    .grade-D, .grade-F { color: var(--bad); }
+
+    table { width: 100%; border-collapse: collapse; background: var(--panel-2); border-radius: 12px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; font-size: 13px; }
+    th { background: #0f172a; color: var(--muted); font-weight: 600; }
+    tr:last-child td { border-bottom: 0; }
+
+    .pill { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .sev-critical { background: #7f1d1d; color: #fecaca; }
+    .sev-high { background: #7c2d12; color: #fed7aa; }
+    .sev-medium { background: #713f12; color: #fef3c7; }
+    .sev-low { background: #1e3a8a; color: #bfdbfe; }
+    .sev-info { background: #1e293b; color: var(--muted); }
+
+    .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .error { background: #450a0a; border: 1px solid var(--bad); color: #fecaca; padding: 12px 14px; border-radius: 10px; margin-bottom: 12px; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; }
+
+    details { background: var(--panel-2); border-radius: 10px; padding: 8px 12px; margin-top: 6px; }
+    details summary { cursor: pointer; font-size: 13px; color: var(--accent-2); }
+    details pre { background: #020617; padding: 10px; border-radius: 8px; overflow: auto; font-size: 12px; }
+
+    .privacy { font-size: 12px; color: var(--muted); margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); }
+    .privacy strong { color: var(--accent-2); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>CATES Service</h1>
+  <p class="lead">
+    Paste a coding-agent primitive — instructions, prompt, MCP config, agent definition —
+    or point us at a GitHub repo. Get a CATES score and improvement targets in seconds.
+    No LLM calls, no content stored.
+  </p>
+
+  <div class="tabs" role="tablist" aria-label="Input mode">
+    <button data-mode="paste" class="active" type="button">Paste</button>
+    <button data-mode="scan" type="button">Scan a repo</button>
+  </div>
+
+  <section id="paste-panel" class="panel">
+    <div class="row">
+      <label class="field" style="flex:1 1 320px;">
+        <span>What is this?</span>
+        <select id="paste-type">
+          <option value=".github/copilot-instructions.md">Copilot instructions (.github/copilot-instructions.md)</option>
+          <option value="AGENTS.md">AGENTS.md (repo-root agent guidance)</option>
+          <option value="CLAUDE.md">CLAUDE.md (Claude project memory)</option>
+          <option value="GEMINI.md">GEMINI.md (Gemini project memory)</option>
+          <option value=".ai/instructions.md">.ai/instructions.md (generic AI rules)</option>
+          <option value=".github/prompts/prompt.md">Prompt file (.github/prompts/*.md)</option>
+          <option value=".mcp.json">MCP config (.mcp.json)</option>
+          <option value=".github/copilot-setup-steps.yml">Setup steps (.github/copilot-setup-steps.yml)</option>
+          <option value=".cursorrules">.cursorrules</option>
+          <option value=".windsurfrules">.windsurfrules</option>
+        </select>
+        <div class="hint">We use the path to pick the right CATES rules for your primitive.</div>
+      </label>
+    </div>
+    <label class="field">
+      <span>Content</span>
+      <textarea id="paste-content" placeholder="Paste your instructions, prompt, or config here..." spellcheck="false"></textarea>
+    </label>
+    <div class="row">
+      <button class="primary" id="run-paste" type="button">Score it</button>
+      <span class="hint" id="paste-status"></span>
+    </div>
+  </section>
+
+  <section id="scan-panel" class="panel" hidden>
+    <label class="field">
+      <span>GitHub URL — repo, folder, file, or PR</span>
+      <input type="text" id="scan-url" placeholder="https://github.com/OWNER/REPO" autocomplete="off" />
+      <div class="hint">Only github.com URLs. The repo is cloned to a temp dir on the server and removed immediately after scoring.</div>
+    </label>
+    <div class="row">
+      <button class="primary" id="run-scan" type="button">Scan</button>
+      <span class="hint" id="scan-status"></span>
+    </div>
+  </section>
+
+  <section id="result" hidden>
+    <h2>Score</h2>
+    <div class="grid">
+      <div class="card"><div class="label">Overall</div><div class="value" id="r-score"></div><div class="sub" id="r-grade"></div></div>
+      <div class="card"><div class="label">Findings</div><div class="value" id="r-findings"></div><div class="sub" id="r-critical"></div></div>
+      <div class="card"><div class="label">Always-loaded tokens</div><div class="value" id="r-tokens"></div><div class="sub">per invocation</div></div>
+      <div class="card"><div class="label">Avoidable waste</div><div class="value" id="r-waste"></div><div class="sub" id="r-waste-pct"></div></div>
+    </div>
+
+    <h2>Dimensions</h2>
+    <table>
+      <thead><tr><th>Dimension</th><th>Score</th><th>Weight</th><th>Summary</th></tr></thead>
+      <tbody id="r-dimensions"></tbody>
+    </table>
+
+    <h2>Findings</h2>
+    <table>
+      <thead><tr><th>Rule</th><th>Severity</th><th>File</th><th>Message &amp; suggestion</th></tr></thead>
+      <tbody id="r-finding-rows"></tbody>
+    </table>
+  </section>
+
+  <section id="error-box" class="error" hidden></section>
+
+  <p class="privacy">
+    <strong>Privacy.</strong> Analysis runs server-side using the same engine as the
+    <code>cates-analyzer</code> CLI — no LLM calls, no telemetry, no content logging.
+    Repos submitted via "Scan a repo" are cloned shallowly into a temp directory and
+    removed once the score is returned. Want full control? Run the
+    <a href="https://github.com/msfttoler/cates">open-source CLI</a> on your own machine.
+  </p>
+</main>
+
+<script>
+  const tabs = document.querySelectorAll('.tabs button');
+  const panels = {
+    paste: document.getElementById('paste-panel'),
+    scan: document.getElementById('scan-panel'),
+  };
+  tabs.forEach(btn => btn.addEventListener('click', () => {
+    tabs.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    Object.entries(panels).forEach(([k, el]) => el.hidden = (k !== btn.dataset.mode));
+  }));
+
+  const $ = id => document.getElementById(id);
+  const errorBox = $('error-box');
+  const result = $('result');
+
+  function showError(message) {
+    result.hidden = true;
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+  }
+  function clearError() { errorBox.hidden = true; errorBox.textContent = ''; }
+
+  function gradeClass(grade) {
+    if (grade === 'A+') return 'grade-Aplus';
+    return 'grade-' + grade;
+  }
+
+  function renderResult(data) {
+    clearError();
+    result.hidden = false;
+
+    $('r-score').textContent = data.score.overall;
+    $('r-score').className = 'value ' + gradeClass(data.score.grade);
+    $('r-grade').textContent = data.score.grade;
+
+    $('r-findings').textContent = data.findings.length;
+    $('r-critical').textContent = data.score.criticalCount + ' critical';
+
+    $('r-tokens').textContent = (data.discovery?.alwaysLoadedTokens ?? 0).toLocaleString();
+    $('r-waste').textContent = data.score.estimatedTokenWaste.toLocaleString();
+    $('r-waste-pct').textContent = data.score.estimatedTokenSavingsPercentage + '% of analyzed tokens';
+
+    const dimRows = data.score.dimensions.map(d => `
+      <tr>
+        <td>${escape(d.dimension)}</td>
+        <td>${d.score}</td>
+        <td>${Math.round(d.weight * 100)}%</td>
+        <td>${escape(d.summary)}</td>
+      </tr>`).join('');
+    $('r-dimensions').innerHTML = dimRows;
+
+    const findings = data.findings.slice().sort((a, b) => severityRank(a.severity) - severityRank(b.severity));
+    const findingRows = findings.map(f => `
+      <tr>
+        <td><code>${escape(f.ruleId)}</code></td>
+        <td><span class="pill sev-${escape(f.severity)}">${escape(f.severity)}</span></td>
+        <td><code>${escape(f.file)}</code>${f.line ? ' :' + f.line : ''}</td>
+        <td>${escape(f.message)}${f.suggestion ? `<div class="hint">↳ ${escape(f.suggestion)}</div>` : ''}</td>
+      </tr>`).join('');
+    $('r-finding-rows').innerHTML = findingRows || '<tr><td colspan="4" style="text-align:center;color:var(--good);">No findings — clean run 🎉</td></tr>';
+  }
+
+  function severityRank(s) {
+    return { critical: 0, high: 1, medium: 2, low: 3, info: 4 }[s] ?? 99;
+  }
+  function escape(s) {
+    return String(s ?? '').replace(/[&<>"']/g, ch => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;',
+    }[ch]));
+  }
+
+  async function postJson(url, body) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    let data;
+    try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
+    if (!res.ok) throw new Error(data?.error ? `${data.error}: ${JSON.stringify(data.details ?? '')}` : `HTTP ${res.status}`);
+    return data;
+  }
+
+  $('run-paste').addEventListener('click', async () => {
+    const content = $('paste-content').value;
+    const path = $('paste-type').value;
+    if (!content.trim()) return showError('Paste some content first.');
+    const btn = $('run-paste'); btn.disabled = true; $('paste-status').textContent = 'Scoring…';
+    try {
+      const data = await postJson('/api/analyze', { files: [{ path, content }] });
+      renderResult(data);
+    } catch (err) {
+      showError(String(err.message ?? err));
+    } finally {
+      btn.disabled = false; $('paste-status').textContent = '';
+    }
+  });
+
+  $('run-scan').addEventListener('click', async () => {
+    const url = $('scan-url').value.trim();
+    if (!url) return showError('Enter a GitHub URL first.');
+    const btn = $('run-scan'); btn.disabled = true; $('scan-status').textContent = 'Cloning + scoring (this can take a few seconds)…';
+    try {
+      const data = await postJson('/api/scan', { url });
+      renderResult(data);
+    } catch (err) {
+      showError(String(err.message ?? err));
+    } finally {
+      btn.disabled = false; $('scan-status').textContent = '';
+    }
+  });
+</script>
+</body>
+</html>

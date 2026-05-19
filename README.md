@@ -122,12 +122,125 @@ az deployment group create \
 Schedule, manual, and event-triggered modes are all supported. Full
 walkthrough in [`deploy/aca/README.md`](deploy/aca/README.md).
 
+## 🌐 CATES Service (hosted UI + HTTP API)
+
+Don't want to install the CLI? Use the **CATES Service** — a hosted
+companion that lets you score a primitive in two ways:
+
+1. **Paste** an instruction file, prompt, MCP config, agent definition,
+   or `.cursorrules` directly into the browser.
+2. **Scan a GitHub URL** — repo, folder, file, or pull request.
+
+Behind the scenes the service runs the exact same analyzer as the CLI
+(`analyze()` / `analyzeInMemory()`), so a score from the service is
+identical to a score from `cates-analyzer` on the same bytes. There are
+**no LLM calls**, **no telemetry**, and **no content logging** —
+submitted text is analyzed in-process and discarded; repos fetched via
+"Scan" are cloned shallowly into a temp directory that is removed as soon
+as the score is returned.
+
+### HTTP API
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/analyze` | In-memory analysis. Body: `{ files: [{path, content}], policy?, tokenizer? }`. |
+| `POST` | `/api/scan` | GitHub-URL analysis. Body: `{ url, policy?, tokenizer? }`. |
+| `GET`  | `/api/rules` | Full `RULE_CATALOG` plus service limits, for UIs and tooling. |
+| `GET`  | `/api/healthz` | Liveness probe. |
+| `GET`  | `/api/readyz` | Readiness probe. |
+
+All endpoints accept and return JSON. The `AnalysisResult` shape returned
+by the analyze and scan endpoints is **the same** type the CLI emits with
+`--format json` — every existing report consumer (dashboard, CI gates,
+SARIF converter) works unchanged.
+
+### Service limits (per request)
+
+| Limit | Value |
+| --- | --- |
+| Max files per request | 50 |
+| Max bytes per file | 100 KB |
+| Max total payload | 1 MB |
+| Per-IP rate limit | 60 requests / minute |
+
+Limits are exposed live at `GET /api/rules` so UIs and CI integrations can
+display them or pre-validate.
+
+### Configuration parity
+
+Every toggle and policy field from
+[`⚙️ Configuring CATES`](#%EF%B8%8F-configuring-cates) is accepted in the
+`policy` field of the request body:
+
+```json
+{
+  "files": [
+    { "path": ".github/copilot-instructions.md", "content": "..." }
+  ],
+  "policy": {
+    "dimensions": { "security": { "enabled": false } },
+    "rules": { "TE004": { "severity": "low" } }
+  }
+}
+```
+
+### Running the service locally
+
+```bash
+# Build and run (Node 20+)
+npm install
+npm run build:service
+npm run service:start         # listens on :8080
+
+# Or in watch mode while developing
+npm run service:dev
+```
+
+Open `http://localhost:8080`.
+
+### Running the service in Docker
+
+The same image powers both the CLI and the service. Override `CMD` to
+launch the service:
+
+```bash
+docker build -t cates .
+docker run --rm -p 8080:8080 cates \
+  node /app/dist-service/service/server.js
+```
+
+### Deploying the service to Azure Container Apps
+
+A sibling Bicep template deploys the service as an always-on Container
+App with scale-to-zero, TLS, and liveness/readiness probes wired to the
+service's health endpoints:
+
+```bash
+az group create -n rg-cates -l eastus2
+az deployment group create -g rg-cates \
+  -f deploy/aca/cates-service.bicep \
+  -p image=ghcr.io/msfttoler/cates:latest
+```
+
+The deployment outputs an HTTPS FQDN you can browse immediately.
+
+### Privacy & threat model
+
+| Concern | Mitigation |
+| --- | --- |
+| Pasted content exfiltration | No persistence, no telemetry, no content logging. The access log records `method/path/status/durationMs` only. |
+| Cross-site framing / SEO indexing | Strict CSP, `frame-ancestors 'none'`, `X-Frame-Options: SAMEORIGIN`, `X-Robots-Tag: noindex, nofollow` set on every response. |
+| Argv-injection via `/api/scan` URLs | URLs flow through the same `parseGitHubLink` guards used by the CLI; refs starting with `-`, traversal segments, and shell metacharacters all return `HTTP 400`. |
+| DoS via giant payloads | Hard per-file + per-request byte caps + JSON body limit, all enforced *before* the analyzer runs. |
+| DoS via repo cloning | Shallow clones with depth=1, temp dir is removed in a `finally` block even if scoring throws. |
+| Auth / multi-tenant data | None in v1 — the service is stateless and anonymous. OAuth, persisted reports, and org dashboards are on the Phase 3 roadmap; see [`VERSIONING.md`](./VERSIONING.md) and the session plan. |
+
 ## ✨ Features at a Glance
 
 | Capability | What you get |
 |---|---|
 | **Zero-LLM static analysis** | Deterministic, fast, no API keys, no data exfiltration |
-| **30+ rules** across 6 dimensions | Token efficiency, security, specificity, completeness, conflict/reachability, harness quality |
+| **42 rules** across 6 dimensions | Token efficiency, security, specificity, completeness, conflict/reachability, harness quality |
 | **Per-family tokenizers** | OpenAI `cl100k`, OpenAI `o200k`, Anthropic Claude, or an offline approximation — pick one or compare side-by-side |
 | **Multi-surface discovery** | Instructions, prompt libraries, MCP configs, hooks, setup steps, editor settings |
 | **Configurable** | Toggle any rule or whole dimension on/off, override severities, suppress with reasons + expirations |
@@ -135,12 +248,13 @@ walkthrough in [`deploy/aca/README.md`](deploy/aca/README.md).
 | **CI-ready gates** | `--min-score`, `--require-level`, `--fail-on`, `--max-always-loaded` |
 | **Conformance levels** | Score against CATES Level 1, 2, or 3 |
 | **GitHub-native review** | `cates-analyzer review <url>` for repos, branches, folders, files, or PRs (uses local `gh` credentials) |
+| **Hosted service + HTTP API** | Paste / scan / programmatic access via the [CATES Service](#-cates-service-hosted-ui--http-api) — same engine, no install |
 | **Portfolio scanning** | Roll up many repos into one report |
 | **Demo mode** | 100-repo built-in manifest (Microsoft, GitHub, Anthropic, broader OSS) |
 | **Safe autofix** | `--fix` / `--fix-dry-run` for mechanical, reviewable changes |
 | **Token economics** | Per-finding token impact + conservative and projected savings estimates |
-| **Hardened runtime** | Sandboxed reads, size/depth limits, binary detection, no network calls |
-| **Multiple ship targets** | npm CLI, Docker image, Helm chart for AKS, Bicep template for Azure Container Apps |
+| **Hardened runtime** | Sandboxed reads, argv-injection guards, size/depth limits, binary detection, no network calls in analyze mode |
+| **Multiple ship targets** | npm CLI, Docker image, Helm chart for AKS, Bicep templates for Azure Container Apps (CLI Job + Service App) |
 
 ## ⚙️ Configuring CATES
 

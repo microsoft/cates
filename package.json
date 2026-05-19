@@ -23,7 +23,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "build:service": "tsc -p tsconfig.service.json",
+    "build:service": "tsc -p tsconfig.service.json && node -e \"require('fs').cpSync('service/web','dist-service/service/web',{recursive:true})\"",
     "dev": "tsx watch src/cli/index.ts",
     "start": "node dist/cli/index.js",
     "service:dev": "tsx watch service/server.ts",
