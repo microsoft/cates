@@ -14,6 +14,8 @@
  */
 
 export { analyze } from './analyzers/index.js';
+export { analyzeInMemory } from './analyze-in-memory.js';
+export type { AnalyzeInMemoryFile, AnalyzeInMemoryOptions } from './analyze-in-memory.js';
 export { createReport } from './scoring/report.js';
 export { evaluateConformance, evaluateGates } from './conformance.js';
 export { RULE_CATALOG, getRule } from './rules/catalog.js';
