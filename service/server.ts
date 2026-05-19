@@ -100,6 +100,7 @@ function wrapAsync<T>(invoke: (req: Request) => Promise<HandlerResult<T>>) {
 }
 
 function privacyPreservingLogger(req: Request, res: Response, next: NextFunction): void {
+  if (process.env.NODE_ENV === 'test' || process.env.CATES_QUIET === '1') return next();
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;

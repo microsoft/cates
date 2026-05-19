@@ -565,12 +565,19 @@ src/
 
 ```bash
 npm install
-npm run typecheck     # TypeScript validation
-npm test              # Vitest test suite
-npm run test:coverage # Coverage report
+npm run typecheck:all   # CLI + service TypeScript validation
+npm test                # Vitest suite (221 tests, ~2s)
+npm run test:coverage   # Coverage + enforce the floor (stmt 88, branch 85, func 92, line 88)
+npm run service:dev     # Run the HTTP service locally with hot reload
 npx tsx src/cli/index.ts ./fixtures/bad   # Test against bad config
 npx tsx src/cli/index.ts ./fixtures/good  # Test against good config
 ```
+
+CI runs `npm run test:coverage`, so any PR that drops below the configured
+coverage thresholds (set in `vitest.config.ts`) will fail. The floor is
+intentionally a few points below the achieved coverage (~91 / 88 / 97 / 91)
+so normal refactors don't trigger flakes; raise it when you legitimately
+improve coverage, never silently lower it.
 
 ## 📋 Complete Rule Reference
 

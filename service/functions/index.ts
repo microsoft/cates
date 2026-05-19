@@ -19,9 +19,12 @@ import {
  * doesn't ship `git`/`gh` binaries — the ACA target continues to handle
  * scan workloads. Phase 2 will swap in isomorphic-git to enable scan on
  * SWA too.
+ *
+ * The individual functions are also exported so unit tests can invoke them
+ * directly without a running Functions host.
  */
 
-function toResponse<T>(result: HandlerResult<T>): HttpResponseInit {
+export function toResponse<T>(result: HandlerResult<T>): HttpResponseInit {
   return {
     status: result.status,
     jsonBody: result.body,
@@ -32,53 +35,45 @@ function toResponse<T>(result: HandlerResult<T>): HttpResponseInit {
   };
 }
 
-app.http('analyze', {
-  route: 'analyze',
-  methods: ['POST'],
-  authLevel: 'anonymous',
-  handler: async (request: HttpRequest, _ctx: InvocationContext) => {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return { status: 400, jsonBody: { error: 'Invalid JSON body' } };
-    }
-    const result = await handleAnalyze(body);
-    return toResponse(result);
-  },
-});
+export async function analyzeFunction(
+  request: HttpRequest,
+  _ctx?: InvocationContext,
+): Promise<HttpResponseInit> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return { status: 400, jsonBody: { error: 'Invalid JSON body' } };
+  }
+  const result = await handleAnalyze(body);
+  return toResponse(result);
+}
 
-app.http('scan', {
-  route: 'scan',
-  methods: ['POST'],
-  authLevel: 'anonymous',
-  handler: async () => ({
+export async function scanFunction(): Promise<HttpResponseInit> {
+  return {
     status: 501,
     jsonBody: {
       error: 'Repo scanning is not available on the public Static Web Apps deployment',
       details:
         'Use the paste endpoint, or deploy CATES Service to ACA for /api/scan support.',
     },
-  }),
-});
+  };
+}
 
-app.http('rules', {
-  route: 'rules',
-  methods: ['GET'],
-  authLevel: 'anonymous',
-  handler: async () => toResponse(handleRules()),
-});
+export async function rulesFunction(): Promise<HttpResponseInit> {
+  return toResponse(handleRules());
+}
 
-app.http('healthz', {
-  route: 'healthz',
-  methods: ['GET'],
-  authLevel: 'anonymous',
-  handler: async () => toResponse(handleHealthz()),
-});
+export async function healthzFunction(): Promise<HttpResponseInit> {
+  return toResponse(handleHealthz());
+}
 
-app.http('readyz', {
-  route: 'readyz',
-  methods: ['GET'],
-  authLevel: 'anonymous',
-  handler: async () => toResponse(handleReadyz()),
-});
+export async function readyzFunction(): Promise<HttpResponseInit> {
+  return toResponse(handleReadyz());
+}
+
+app.http('analyze', { route: 'analyze', methods: ['POST'], authLevel: 'anonymous', handler: analyzeFunction });
+app.http('scan', { route: 'scan', methods: ['POST'], authLevel: 'anonymous', handler: scanFunction });
+app.http('rules', { route: 'rules', methods: ['GET'], authLevel: 'anonymous', handler: rulesFunction });
+app.http('healthz', { route: 'healthz', methods: ['GET'], authLevel: 'anonymous', handler: healthzFunction });
+app.http('readyz', { route: 'readyz', methods: ['GET'], authLevel: 'anonymous', handler: readyzFunction });
