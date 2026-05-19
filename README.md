@@ -224,6 +224,42 @@ az deployment group create -g rg-cates \
 
 The deployment outputs an HTTPS FQDN you can browse immediately.
 
+### Deploying the service to Azure Static Web Apps (public demo)
+
+For a serverless, zero-cost-when-idle public demo, deploy to **Azure
+Static Web Apps** + **Azure Functions**:
+
+```bash
+az staticwebapp create -g rg-cates -n swa-cates -l eastus2 --sku Free \
+  --source https://github.com/msfttoler/cates --branch main \
+  --login-with-github
+```
+
+Add the deployment token as the GitHub Actions secret
+`AZURE_STATIC_WEB_APPS_API_TOKEN` and the bundled
+[`swa-deploy.yml`](.github/workflows/swa-deploy.yml) workflow ships the
+SPA + Functions on every push to `main`. Full walkthrough in
+[`deploy/swa/README.md`](deploy/swa/README.md).
+
+> **Note:** `/api/scan` returns `501` on the SWA target because the
+> Functions runtime doesn't ship `git`. Use ACA (above) for repo
+> scanning, or wait for the Phase 2 `isomorphic-git` rewrite.
+
+### Rule &amp; dimension toggles in the UI
+
+The hosted UI ships with a **toggle drawer** at the top of the page that
+fetches `GET /api/rules` and lets you:
+
+- Disable any individual rule (single-click on the rule pill)
+- Disable an entire dimension (click the dimension button — e.g.
+  "security" if you're a GHAS customer)
+- Override severity per rule
+- Export the current state as `.cates.yml` for committing to your repo
+
+Every toggle is sent in the `policy` field of the next request, so the
+score updates immediately and the result includes `disabledRuleIds` /
+`disabledDimensions` for auditability.
+
 ### Privacy & threat model
 
 | Concern | Mitigation |

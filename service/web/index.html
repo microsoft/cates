@@ -94,6 +94,26 @@
 
     .privacy { font-size: 12px; color: var(--muted); margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); }
     .privacy strong { color: var(--accent-2); }
+
+    .toolbar { display: flex; justify-content: flex-end; gap: 8px; margin: -8px 0 12px; }
+    .drawer { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 16px; }
+    .drawer summary { padding: 14px 18px; cursor: pointer; font-weight: 600; color: var(--accent-2); list-style: none; }
+    .drawer summary::-webkit-details-marker { display: none; }
+    .drawer summary::before { content: '▶'; display: inline-block; margin-right: 8px; transition: transform 0.15s; font-size: 10px; color: var(--muted); }
+    .drawer[open] summary::before { transform: rotate(90deg); }
+    .drawer-body { padding: 0 18px 18px; }
+    .toggle-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .toggle-bar button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); padding: 6px 12px; border-radius: 999px; font-size: 12px; cursor: pointer; }
+    .toggle-bar button.dim-off { background: #450a0a; border-color: var(--bad); color: #fecaca; }
+    .rule-group { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .rule-group h3 { margin: 0 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .rule-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 12px; }
+    .rule-grid label { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; padding: 2px 0; }
+    .rule-grid label.disabled { color: var(--muted); text-decoration: line-through; }
+    .rule-grid input { accent-color: var(--accent); }
+    .drawer-actions { display: flex; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .yaml-preview { margin-top: 12px; }
+    .yaml-preview pre { background: #020617; padding: 10px 12px; border-radius: 8px; font-size: 12px; max-height: 220px; overflow: auto; }
   </style>
 </head>
 <body>
@@ -109,6 +129,27 @@
     <button data-mode="paste" class="active" type="button">Paste</button>
     <button data-mode="scan" type="button">Scan a repo</button>
   </div>
+
+  <details class="drawer" id="toggle-drawer">
+    <summary>Rule &amp; dimension toggles · export as <code>.cates.yml</code></summary>
+    <div class="drawer-body">
+      <p class="hint" style="margin-top:0;">
+        Disable rules or whole dimensions to fit your policy
+        (e.g. <em>turn off all security rules if you use GHAS</em>). The
+        toggle state is sent with every request and surfaces in the result as
+        <code>disabledFindings</code>.
+      </p>
+      <div class="toggle-bar" id="dim-bar"></div>
+      <div id="rule-groups"></div>
+      <div class="drawer-actions">
+        <button type="button" class="ghost" id="reset-toggles">Reset to defaults</button>
+        <button type="button" class="ghost" id="export-yml">Show .cates.yml</button>
+        <button type="button" class="ghost" id="copy-yml">Copy .cates.yml</button>
+        <span class="hint" id="yml-status"></span>
+      </div>
+      <div class="yaml-preview" id="yml-preview" hidden><pre id="yml-text"></pre></div>
+    </div>
+  </details>
 
   <section id="paste-panel" class="panel">
     <div class="row">
@@ -269,13 +310,161 @@
     return data;
   }
 
+  // ─── Rule/dimension toggle drawer ────────────────────────────────────────
+  const DIMENSIONS = [
+    'security',
+    'token-efficiency',
+    'specificity',
+    'completeness',
+    'conflict-reachability',
+    'harness-quality',
+  ];
+  const toggleState = {
+    rules: {},      // ruleId -> false (disabled)
+    dimensions: {}, // dimension -> false (disabled)
+  };
+  let ruleCatalog = [];
+
+  async function loadRuleCatalog() {
+    try {
+      const res = await fetch('/api/rules');
+      const data = await res.json();
+      ruleCatalog = data.rules ?? [];
+      renderDrawer();
+    } catch (err) {
+      console.warn('Failed to load /api/rules; toggles disabled', err);
+    }
+  }
+
+  function renderDrawer() {
+    const dimBar = document.getElementById('dim-bar');
+    dimBar.innerHTML = DIMENSIONS.map(d => {
+      const off = toggleState.dimensions[d] === false;
+      return `<button type="button" class="${off ? 'dim-off' : ''}" data-dim="${d}">${off ? '⏻ ' : ''}${d}${off ? ' (off)' : ''}</button>`;
+    }).join('');
+    dimBar.querySelectorAll('button[data-dim]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const d = btn.dataset.dim;
+        if (toggleState.dimensions[d] === false) delete toggleState.dimensions[d];
+        else toggleState.dimensions[d] = false;
+        renderDrawer();
+      });
+    });
+
+    const groups = {};
+    for (const r of ruleCatalog) (groups[r.dimension] ||= []).push(r);
+    const groupsEl = document.getElementById('rule-groups');
+    groupsEl.innerHTML = DIMENSIONS
+      .filter(d => groups[d])
+      .map(d => {
+        const dimOff = toggleState.dimensions[d] === false;
+        const items = groups[d]
+          .slice()
+          .sort((a, b) => a.id.localeCompare(b.id))
+          .map(r => {
+            const ruleOff = toggleState.rules[r.id] === false;
+            const effectiveOff = ruleOff || (dimOff && toggleState.rules[r.id] !== true);
+            return `<label class="${effectiveOff ? 'disabled' : ''}" title="${escape(r.title)}">
+              <input type="checkbox" data-rule="${r.id}" ${effectiveOff ? '' : 'checked'} />
+              <code>${r.id}</code> <span style="color:var(--muted);font-size:11px;">${escape(severityShort(r.severity))}</span>
+            </label>`;
+          })
+          .join('');
+        return `<div class="rule-group">
+          <h3>${escape(d)}</h3>
+          <div class="rule-grid">${items}</div>
+        </div>`;
+      })
+      .join('');
+    groupsEl.querySelectorAll('input[data-rule]').forEach(input => {
+      input.addEventListener('change', () => {
+        const id = input.dataset.rule;
+        if (input.checked) {
+          delete toggleState.rules[id];
+          // If a dimension is disabled but the user re-enabled this rule,
+          // record an explicit enable so the server overrides the dim toggle.
+          const r = ruleCatalog.find(x => x.id === id);
+          if (r && toggleState.dimensions[r.dimension] === false) {
+            toggleState.rules[id] = true;
+          }
+        } else {
+          toggleState.rules[id] = false;
+        }
+        renderDrawer();
+      });
+    });
+  }
+
+  function severityShort(s) {
+    return ({ critical: 'CRIT', high: 'HIGH', medium: 'MED', low: 'LOW', info: 'INFO' })[s] ?? s;
+  }
+
+  function policyPayload() {
+    const rules = {};
+    for (const [id, v] of Object.entries(toggleState.rules)) {
+      rules[id] = { enabled: v };
+    }
+    const dimensions = {};
+    for (const [d, v] of Object.entries(toggleState.dimensions)) {
+      dimensions[d] = { enabled: v };
+    }
+    if (Object.keys(rules).length === 0 && Object.keys(dimensions).length === 0) return undefined;
+    const policy = {};
+    if (Object.keys(rules).length) policy.rules = rules;
+    if (Object.keys(dimensions).length) policy.dimensions = dimensions;
+    return policy;
+  }
+
+  function toCatesYaml() {
+    const lines = ['# Generated by the CATES Service drawer'];
+    const dims = Object.entries(toggleState.dimensions);
+    if (dims.length) {
+      lines.push('dimensions:');
+      for (const [d, v] of dims) lines.push(`  ${d}: ${v === false ? 'off' : 'on'}`);
+    }
+    const rules = Object.entries(toggleState.rules);
+    if (rules.length) {
+      lines.push('rules:');
+      for (const [id, v] of rules) lines.push(`  ${id}: ${v === false ? 'off' : 'on'}`);
+    }
+    if (lines.length === 1) lines.push('# No toggles set. Default policy is in effect.');
+    return lines.join('\n');
+  }
+
+  document.getElementById('reset-toggles').addEventListener('click', () => {
+    toggleState.rules = {};
+    toggleState.dimensions = {};
+    renderDrawer();
+    document.getElementById('yml-preview').hidden = true;
+  });
+  document.getElementById('export-yml').addEventListener('click', () => {
+    document.getElementById('yml-text').textContent = toCatesYaml();
+    document.getElementById('yml-preview').hidden = false;
+  });
+  document.getElementById('copy-yml').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(toCatesYaml());
+      const status = document.getElementById('yml-status');
+      status.textContent = 'Copied!';
+      setTimeout(() => (status.textContent = ''), 1500);
+    } catch (err) {
+      document.getElementById('yml-text').textContent = toCatesYaml();
+      document.getElementById('yml-preview').hidden = false;
+    }
+  });
+
+  loadRuleCatalog();
+
   $('run-paste').addEventListener('click', async () => {
     const content = $('paste-content').value;
     const path = $('paste-type').value;
     if (!content.trim()) return showError('Paste some content first.');
     const btn = $('run-paste'); btn.disabled = true; $('paste-status').textContent = 'Scoring…';
     try {
-      const data = await postJson('/api/analyze', { files: [{ path, content }] });
+      const body = { files: [{ path, content }] };
+      const policy = policyPayload();
+      if (policy) body.policy = policy;
+      const data = await postJson('/api/analyze', body);
       renderResult(data);
     } catch (err) {
       showError(String(err.message ?? err));
@@ -289,7 +478,10 @@
     if (!url) return showError('Enter a GitHub URL first.');
     const btn = $('run-scan'); btn.disabled = true; $('scan-status').textContent = 'Cloning + scoring (this can take a few seconds)…';
     try {
-      const data = await postJson('/api/scan', { url });
+      const body = { url };
+      const policy = policyPayload();
+      if (policy) body.policy = policy;
+      const data = await postJson('/api/scan', body);
       renderResult(data);
     } catch (err) {
       showError(String(err.message ?? err));
