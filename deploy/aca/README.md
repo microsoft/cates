@@ -8,7 +8,7 @@ batch analyzer that exits when done.
 ```bash
 RG=rg-cates
 LOC=eastus2
-IMG=ghcr.io/msfttoler/cates:1.0.0
+IMG=ghcr.io/microsoft/cates:1.0.0
 
 az group create -n $RG -l $LOC
 
@@ -38,7 +38,7 @@ az containerapp job create \
   --cron-expression "0 6 * * *" \
   --replica-timeout 3600 \
   --replica-retry-limit 1 \
-  --image ghcr.io/msfttoler/cates:1.0.0 \
+  --image ghcr.io/microsoft/cates:1.0.0 \
   --cpu 0.5 --memory 1Gi \
   --secrets gh-token=$GH_TOKEN \
   --env-vars GH_TOKEN=secretref:gh-token \

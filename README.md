@@ -25,7 +25,7 @@ npm install --save-dev cates-analyzer
 npx cates-analyzer .
 
 # 4) Run it in Docker (no Node.js required locally)
-docker run --rm -v "$PWD:/work" ghcr.io/msfttoler/cates:latest .
+docker run --rm -v "$PWD:/work" ghcr.io/microsoft/cates:latest .
 ```
 
 Requires Node.js **>= 20** for the npm install paths. The Docker image
@@ -116,7 +116,7 @@ For a server-less, no-cluster deployment, run CATES as an **ACA Job**:
 az deployment group create \
   -g rg-cates \
   -f deploy/aca/cates-job.bicep \
-  -p image=ghcr.io/msfttoler/cates:1.0.0 githubToken=$GH_TOKEN
+  -p image=ghcr.io/microsoft/cates:1.0.0 githubToken=$GH_TOKEN
 ```
 
 Schedule, manual, and event-triggered modes are all supported. Full
@@ -223,7 +223,7 @@ a deployment to happen.
 az group create -n rg-cates -l eastus2
 az deployment group create -g rg-cates \
   -f deploy/aca/cates-service.bicep \
-  -p image=ghcr.io/msfttoler/cates:latest
+  -p image=ghcr.io/microsoft/cates:latest
 ```
 
 Scale-to-zero on idle, HTTP-concurrency autoscaling, free TLS, liveness
@@ -236,7 +236,7 @@ detail in [`deploy/aca/cates-service.bicep`](deploy/aca/cates-service.bicep).
 az group create -n rg-cates -l eastus2
 az deployment group create -g rg-cates \
   -f deploy/appservice/cates-service.bicep \
-  -p image=ghcr.io/msfttoler/cates:latest
+  -p image=ghcr.io/microsoft/cates:latest
 ```
 
 Linux Web App on an App Service Plan (defaults to the cheapest always-on

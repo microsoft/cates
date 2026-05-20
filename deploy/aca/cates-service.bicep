@@ -7,7 +7,7 @@
 // Deploy:
 //   az group create -n rg-cates -l eastus2
 //   az deployment group create -g rg-cates -f deploy/aca/cates-service.bicep \
-//     -p image=ghcr.io/msfttoler/cates:1.1.0
+//     -p image=ghcr.io/microsoft/cates:1.1.0
 //
 // After deployment, browse to the FQDN printed in the outputs.
 

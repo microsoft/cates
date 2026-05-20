@@ -27,7 +27,7 @@ az group create -n rg-cates -l eastus2
 az deployment group create \
   -g rg-cates \
   -f deploy/appservice/cates-service.bicep \
-  -p image=ghcr.io/msfttoler/cates:latest
+  -p image=ghcr.io/microsoft/cates:latest
 ```
 
 Parameters you may want to override:

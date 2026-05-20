@@ -77,6 +77,6 @@ CMD ["--help"]
 # OCI labels for traceability.
 LABEL org.opencontainers.image.title="cates-analyzer" \
       org.opencontainers.image.description="Analyze coding agent configurations for token efficiency, security, and CATES conformance" \
-      org.opencontainers.image.source="https://github.com/msfttoler/cates" \
+      org.opencontainers.image.source="https://github.com/microsoft/cates" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.vendor="msfttoler"
+      org.opencontainers.image.vendor="Microsoft"

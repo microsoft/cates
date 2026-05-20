@@ -12,9 +12,9 @@ keywords:
   - coding-agent
   - analyzer
   - security
-home: https://github.com/msfttoler/cates
+home: https://github.com/microsoft/cates
 sources:
-  - https://github.com/msfttoler/cates
+  - https://github.com/microsoft/cates
 maintainers:
   - name: msfttoler
 icon: https://avatars.githubusercontent.com/u/9919?s=200&v=4

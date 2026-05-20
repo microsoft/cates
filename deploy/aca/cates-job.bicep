@@ -7,7 +7,7 @@
 // Deploy:
 //   az group create -n rg-cates -l eastus2
 //   az deployment group create -g rg-cates -f deploy/aca/cates-job.bicep \
-//     -p image=ghcr.io/msfttoler/cates:1.0.0 githubToken=$GH_TOKEN
+//     -p image=ghcr.io/microsoft/cates:1.0.0 githubToken=$GH_TOKEN
 
 @description('ACA environment name. Created if it does not exist.')
 param environmentName string = 'cae-cates'

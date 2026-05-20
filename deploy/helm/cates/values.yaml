@@ -5,7 +5,7 @@
 mode: cronjob
 
 image:
-  repository: ghcr.io/msfttoler/cates
+  repository: ghcr.io/microsoft/cates
   tag: ""              # defaults to .Chart.AppVersion when empty
   pullPolicy: IfNotPresent
   pullSecrets: []      # [{ name: ghcr-creds }]
@@ -56,7 +56,7 @@ githubToken:
 policy:
   enabled: false
   content: |
-    # See https://github.com/msfttoler/cates for the policy schema.
+    # See https://github.com/microsoft/cates for the policy schema.
     version: 1
     severityThreshold: high
 
