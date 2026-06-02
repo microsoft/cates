@@ -1,6 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import type { Finding, AnalyzerOptions } from '../types.js';
+import type { Finding, AnalyzerOptions, AnalyzerFile } from '../types.js';
 import { countTokens } from '../utils/tokenizer.js';
+import { isScannableLine } from '../utils/regex-guards.js';
 
 /**
  * Token Efficiency Analyzer
@@ -21,21 +21,16 @@ interface FileContent {
 }
 
 export async function analyzeTokenEfficiency(
-  files: Array<{ path: string; relativePath: string }>,
+  files: AnalyzerFile[],
   _options: AnalyzerOptions,
 ): Promise<Finding[]> {
   const findings: Finding[] = [];
-  const fileContents: FileContent[] = [];
-
-  for (const file of files) {
-    const content = await readFile(file.path, 'utf-8');
-    fileContents.push({
-      path: file.path,
-      relativePath: file.relativePath,
-      content,
-      tokenCount: countTokens(content),
-    });
-  }
+  const fileContents: FileContent[] = files.map(file => ({
+    path: file.path,
+    relativePath: file.relativePath,
+    content: file.content,
+    tokenCount: countTokens(file.content),
+  }));
 
   for (const fc of fileContents) {
     findings.push(...checkRedundantPhrasing(fc));
@@ -129,6 +124,7 @@ function checkGenericFiller(fc: FileContent): Finding[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+    if (!isScannableLine(line)) continue;
     for (const { pattern, label } of GENERIC_FILLER_PATTERNS) {
       if (pattern.test(line)) {
         findings.push({
@@ -161,6 +157,7 @@ function checkForcedVerbosity(fc: FileContent): Finding[] {
   const lines = fc.content.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+    if (!isScannableLine(line)) continue;
     for (const { pattern, label } of patterns) {
       if (pattern.test(line)) {
         findings.push({

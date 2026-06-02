@@ -1,4 +1,4 @@
-import type { AnalyzerOptions, AnalysisResult, Finding } from '../types.js';
+import type { AnalyzerOptions, AnalysisResult, AnalyzerFile, Finding } from '../types.js';
 import { AnalyzerOptionsSchema } from '../types.js';
 import { withTokenizer, getDefaultTokenizer } from '../utils/tokenizer.js';
 import { discoverFiles } from './discovery.js';
@@ -16,7 +16,9 @@ import { applyRuleConfig } from '../rule-config.js';
 
 /**
  * Main analysis orchestrator.
- * Discovers files, runs all analyzers, computes scores, generates recommendations.
+ * Discovers files (read from disk exactly once), runs all analyzers in
+ * parallel on the in-memory content cache, computes scores, generates
+ * recommendations.
  */
 export async function analyze(rawOptions: Partial<AnalyzerOptions> & { repoPath: string }): Promise<AnalysisResult> {
   const options = AnalyzerOptionsSchema.parse(rawOptions);
@@ -25,14 +27,19 @@ export async function analyze(rawOptions: Partial<AnalyzerOptions> & { repoPath:
 }
 
 async function analyzeWithContext(options: AnalyzerOptions): Promise<AnalysisResult> {
-  // Phase 1: Discovery (secure file enumeration)
-  const discovery = await discoverFiles(options);
+  // Phase 1: Discovery (secure file enumeration + single read of every file)
+  const { result: discovery, contents } = await discoverFiles(options);
 
-  const activeFiles = discovery.files
+  const activeFiles: AnalyzerFile[] = discovery.files
     .filter(f => f.isActive)
-    .map(f => ({ path: f.path, relativePath: f.relativePath }));
+    .map(f => ({
+      path: f.path,
+      relativePath: f.relativePath,
+      content: contents.get(f.path) ?? '',
+    }));
 
-  // Phase 2: Run all analyzers in parallel (no LLM calls — pure heuristics)
+  // Phase 2: Run all analyzers in parallel against the in-memory content
+  // cache — no LLM calls, no second pass against the filesystem.
   const [
     tokenFindings,
     securityFindings,

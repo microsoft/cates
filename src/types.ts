@@ -96,6 +96,16 @@ export interface DiscoveredFile {
   isActive: boolean; // false = dead/unreachable file
 }
 
+/**
+ * A discovered file with its already-loaded content. Passed to all
+ * analyzers so each file is read from disk exactly once per analysis run.
+ */
+export interface AnalyzerFile {
+  path: string;
+  relativePath: string;
+  content: string;
+}
+
 export interface DiscoveryResult {
   files: DiscoveredFile[];
   totalTokens: number;

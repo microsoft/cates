@@ -1,0 +1,52 @@
+name: npm-publish
+
+# Fires when release-please creates a tag (e.g. `cates-analyzer-v1.2.0`) or
+# any `v*` tag manually pushed. Requires the `NPM_TOKEN` repo secret with
+# publish permission on the `cates-analyzer` package. Publishes with
+# --provenance so the resulting tarball is signed and verifiable on npm.
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'cates-analyzer-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # required for npm provenance (Sigstore)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck:all
+
+      - run: npm test
+
+      - run: npm run build
+
+      - name: Generate CycloneDX SBOM
+        run: npm sbom --sbom-format=cyclonedx > cates-analyzer-sbom.cdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: cates-analyzer-sbom.cdx.json
+          retention-days: 90
+
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

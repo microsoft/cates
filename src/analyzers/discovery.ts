@@ -3,6 +3,12 @@ import { readdir, stat, realpath, open } from 'node:fs/promises';
 import type { DiscoveredFile, DiscoveryResult, ConfigType, ConfigScope, AnalyzerOptions } from '../types.js';
 import { countTokens, countTokensAcross, getDefaultTokenizer, type TokenizerId } from '../utils/tokenizer.js';
 
+export interface DiscoveryOutput {
+  result: DiscoveryResult;
+  /** Real-path -> UTF-8 content for every active file. Lets analyzers run without re-reading from disk. */
+  contents: Map<string, string>;
+}
+
 /**
  * Securely discovers coding-agent configuration files in a repository.
  *
@@ -88,9 +94,10 @@ const CONFIG_PATTERNS: Array<{ pattern: RegExp; type: ConfigType; scope: ConfigS
 
 type FileClassification = { type: ConfigType; scope: ConfigScope };
 
-export async function discoverFiles(options: AnalyzerOptions): Promise<DiscoveryResult> {
+export async function discoverFiles(options: AnalyzerOptions): Promise<DiscoveryOutput> {
   const repoRoot = await realpath(resolve(options.repoPath));
   const files: DiscoveredFile[] = [];
+  const contents = new Map<string, string>();
   const activeContents: string[] = []; // retained only when comparison is requested
   const tokenizer: TokenizerId = options.tokenizer ?? getDefaultTokenizer();
   const compareSet: TokenizerId[] | undefined = options.compareTokenizers && options.compareTokenizers.length > 0
@@ -126,9 +133,11 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
         return;
       }
 
-      // Security: skip binary files
-      const content = await fh.readFile('utf-8');
-      if (isBinary(content)) return;
+      // Read as Buffer so the binary heuristic operates on raw bytes and
+      // we can skip the UTF-8 decode entirely for binary files.
+      const buffer = await fh.readFile();
+      if (isBinary(buffer)) return;
+      const content = buffer.toString('utf-8');
 
       const tokenCount = countTokens(content, tokenizer);
 
@@ -141,6 +150,7 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
         tokenCount,
         isActive: true,
       });
+      contents.set(realFullPath, content);
       if (compareSet) activeContents.push(content);
     } finally {
       await fh.close();
@@ -247,26 +257,30 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
   }
 
   return {
-    files,
-    totalTokens: activeFiles.reduce((sum, f) => sum + f.tokenCount, 0),
-    alwaysLoadedTokens,
-    conditionalTokens,
-    deadFileTokens,
-    tokenizer,
-    ...(totalTokensByTokenizer ? { totalTokensByTokenizer } : {}),
+    result: {
+      files,
+      totalTokens: activeFiles.reduce((sum, f) => sum + f.tokenCount, 0),
+      alwaysLoadedTokens,
+      conditionalTokens,
+      deadFileTokens,
+      tokenizer,
+      ...(totalTokensByTokenizer ? { totalTokensByTokenizer } : {}),
+    },
+    contents,
   };
 }
 
-function isBinary(content: string): boolean {
-  // Check for null bytes or high ratio of non-printable characters
-  const sample = content.slice(0, 8192);
+function isBinary(buffer: Buffer): boolean {
+  // Check for null bytes or high ratio of non-printable bytes in the first 8KB.
+  const sampleLen = Math.min(buffer.length, 8192);
+  if (sampleLen === 0) return false;
   let nonPrintable = 0;
-  for (let i = 0; i < sample.length; i++) {
-    const code = sample.charCodeAt(i);
-    if (code === 0) return true;
-    if (code < 32 && code !== 9 && code !== 10 && code !== 13) nonPrintable++;
+  for (let i = 0; i < sampleLen; i++) {
+    const byte = buffer[i]!;
+    if (byte === 0) return true;
+    if (byte < 32 && byte !== 9 && byte !== 10 && byte !== 13) nonPrintable++;
   }
-  return nonPrintable / sample.length > 0.1;
+  return nonPrintable / sampleLen > 0.1;
 }
 
 function isInside(root: string, candidate: string): boolean {

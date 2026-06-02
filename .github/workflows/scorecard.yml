@@ -1,0 +1,45 @@
+name: ossf-scorecard
+
+# OpenSSF Scorecard runs a battery of supply-chain best-practice checks
+# (branch protection, pinned actions, signed releases, dangerous workflows,
+# token permissions, etc.) and uploads results to the GitHub Security tab.
+
+on:
+  branch_protection_rule:
+  schedule:
+    - cron: '0 6 * * 1'   # Weekly, Mondays 06:00 UTC
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write   # upload SARIF
+      id-token: write          # publish results to https://api.scorecard.dev
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: ossf/scorecard-action@v2
+        with:
+          results_file: scorecard.sarif
+          results_format: sarif
+          publish_results: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scorecard-results
+          path: scorecard.sarif
+          retention-days: 7
+
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: scorecard.sarif

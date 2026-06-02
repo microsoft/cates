@@ -1,6 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import type { Finding, AnalyzerOptions } from '../types.js';
+import type { Finding, AnalyzerOptions, AnalyzerFile } from '../types.js';
 import { countTokens } from '../utils/tokenizer.js';
+import { isScannableLine } from '../utils/regex-guards.js';
 
 /**
  * Specificity & Quality Analyzer
@@ -11,17 +11,16 @@ import { countTokens } from '../utils/tokenizer.js';
  */
 
 export async function analyzeSpecificity(
-  files: Array<{ path: string; relativePath: string }>,
+  files: AnalyzerFile[],
   _options: AnalyzerOptions,
 ): Promise<Finding[]> {
   const findings: Finding[] = [];
 
   for (const file of files) {
-    const content = await readFile(file.path, 'utf-8');
-    const lines = content.split('\n');
+    const lines = file.content.split('\n');
 
     findings.push(...checkVagueInstructions(lines, file.relativePath));
-    findings.push(...checkMissingProjectContext(content, file.relativePath));
+    findings.push(...checkMissingProjectContext(file.content, file.relativePath));
     findings.push(...checkActionability(lines, file.relativePath));
   }
 
@@ -47,6 +46,7 @@ function checkVagueInstructions(lines: string[], file: string): Finding[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     if (line.trim().length < 10) continue;
+    if (!isScannableLine(line)) continue;
 
     for (const { pattern, label } of VAGUE_PATTERNS) {
       if (pattern.test(line)) {
@@ -123,6 +123,10 @@ function checkActionability(lines: string[], file: string): Finding[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!.trim();
     if (line.length < 15 || line.startsWith('#') || line.startsWith('```')) {
+      consecutiveAbstract = 0;
+      continue;
+    }
+    if (!isScannableLine(line)) {
       consecutiveAbstract = 0;
       continue;
     }

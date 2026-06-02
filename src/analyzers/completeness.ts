@@ -1,5 +1,4 @@
-import { readFile } from 'node:fs/promises';
-import type { Finding, AnalyzerOptions } from '../types.js';
+import type { Finding, AnalyzerOptions, AnalyzerFile } from '../types.js';
 
 /**
  * Completeness Analyzer
@@ -54,17 +53,13 @@ const ESSENTIAL_TOPICS = [
 ];
 
 export async function analyzeCompleteness(
-  files: Array<{ path: string; relativePath: string }>,
+  files: AnalyzerFile[],
   _options: AnalyzerOptions,
 ): Promise<Finding[]> {
   const findings: Finding[] = [];
 
   // Concatenate all config content to check coverage
-  let allContent = '';
-  for (const file of files) {
-    const content = await readFile(file.path, 'utf-8');
-    allContent += '\n' + content;
-  }
+  const allContent = files.map(f => f.content).join('\n');
 
   if (allContent.trim().length === 0) {
     findings.push({
@@ -105,7 +100,7 @@ export async function analyzeCompleteness(
 
   // Check for file organization (single massive file vs well-structured)
   if (files.length === 1) {
-    const content = await readFile(files[0]!.path, 'utf-8');
+    const content = files[0]!.content;
     const lineCount = content.split('\n').length;
     if (lineCount > 200) {
       findings.push({

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import helmet from 'helmet';
 import {
@@ -18,15 +19,25 @@ import {
  * - JSON body parser is capped at 1 MB (matches the schema-level guard).
  * - In-process rate limiting (token bucket per IP) — cheap defense for the
  *   public demo. Place a real WAF / Front Door in front for prod.
+ * - Concurrent /api/scan operations are bounded by a process-wide semaphore
+ *   so a flood of slow clones cannot saturate the event loop.
+ * - `trust proxy` is configurable via TRUST_PROXY (default: `loopback` for
+ *   local dev; set to `1` or a CIDR in App Service / ACA so `req.ip` is the
+ *   real client IP and per-IP rate-limit buckets work correctly).
  * - Server NEVER logs request bodies or response bodies. Only method, path,
- *   status, and duration. This preserves the "no content stored" promise
- *   the dashboard makes to users.
+ *   status, duration, and request-id.
  */
+
+const MAX_CONCURRENT_SCANS = Number(process.env.CATES_MAX_CONCURRENT_SCANS) || 4;
 
 export function createServer(): express.Express {
   const app = express();
 
   app.disable('x-powered-by');
+  // When deployed behind ACA / App Service / a reverse proxy, set TRUST_PROXY
+  // to '1' (or a CIDR) so req.ip reflects the X-Forwarded-For client IP.
+  // Default to 'loopback' which is safe for local dev.
+  app.set('trust proxy', process.env.TRUST_PROXY ?? 'loopback');
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -57,7 +68,7 @@ export function createServer(): express.Express {
 
   // ─── API ──────────────────────────────────────────────────────────────────
   app.post('/api/analyze', wrapAsync(req => handleAnalyze(req.body)));
-  app.post('/api/scan', wrapAsync(req => handleScan(req.body)));
+  app.post('/api/scan', scanConcurrencyLimiter(MAX_CONCURRENT_SCANS), wrapAsync(req => handleScan(req.body)));
   app.get('/api/rules', wrap(() => handleRules()));
   app.get('/api/healthz', wrap(() => handleHealthz()));
   app.get('/api/readyz', wrap(() => handleReadyz()));
@@ -100,6 +111,12 @@ function wrapAsync<T>(invoke: (req: Request) => Promise<HandlerResult<T>>) {
 }
 
 function privacyPreservingLogger(req: Request, res: Response, next: NextFunction): void {
+  // Stamp every request with a stable correlation id, echo it back to the
+  // client, and include it in the structured log line. This lets operators
+  // join a user-reported error to the corresponding access log entry without
+  // ever logging request or response bodies.
+  const requestId = String(req.headers['x-request-id'] ?? randomUUID());
+  res.setHeader('X-Request-Id', requestId);
   if (process.env.NODE_ENV === 'test' || process.env.CATES_QUIET === '1') return next();
   const start = Date.now();
   res.on('finish', () => {
@@ -110,6 +127,7 @@ function privacyPreservingLogger(req: Request, res: Response, next: NextFunction
     console.log(
       JSON.stringify({
         t: new Date().toISOString(),
+        requestId,
         method: req.method,
         path: req.path,
         status: res.statusCode,
@@ -144,9 +162,36 @@ function rateLimit(options: { windowMs: number; max: number }) {
   };
 }
 
+/**
+ * Bounds concurrent /api/scan operations across the whole process. Scans
+ * shell out to git/gh and can hold a worker for tens of seconds, so a flood
+ * of unrelated clients could starve all other endpoints if unbounded. The
+ * per-IP `rateLimit` middleware does not help here because the cost lives
+ * on the server side, not the client.
+ *
+ * Excess requests get HTTP 503 with a Retry-After hint instead of being
+ * silently queued (which would build a hidden backlog and hide latency in
+ * dashboards).
+ */
+function scanConcurrencyLimiter(max: number) {
+  let inFlight = 0;
+  return (_req: Request, res: Response, next: NextFunction): void => {
+    if (inFlight >= max) {
+      res.setHeader('Retry-After', '10');
+      res.status(503).json({ error: 'Scan capacity exceeded; retry shortly' });
+      return;
+    }
+    inFlight++;
+    res.on('finish', () => { inFlight--; });
+    res.on('close', () => { if (!res.writableEnded) inFlight--; });
+    next();
+  };
+}
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 const PORT = Number(process.env.PORT) || 8080;
+const SHUTDOWN_GRACE_MS = Number(process.env.CATES_SHUTDOWN_GRACE_MS) || 15_000;
 
 // Allow `node service/server.js` or `tsx service/server.ts` to start the
 // service directly. Tests can `import { createServer }` without binding.
@@ -156,8 +201,29 @@ const isEntryPoint =
 
 if (isEntryPoint) {
   const app = createServer();
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     // eslint-disable-next-line no-console
     console.log(`cates-service listening on :${PORT}`);
   });
+
+  // Graceful shutdown: stop accepting new connections, let in-flight work
+  // drain, then exit. ACA / App Service send SIGTERM and wait ~30s before
+  // SIGKILL during rolling deploys, so honoring this avoids cut-off scans
+  // and 502s during the deploy window.
+  const shutdown = (signal: NodeJS.Signals) => {
+    // eslint-disable-next-line no-console
+    console.log(JSON.stringify({ t: new Date().toISOString(), event: 'shutdown', signal }));
+    const forceExit = setTimeout(() => {
+      // eslint-disable-next-line no-console
+      console.error(JSON.stringify({ t: new Date().toISOString(), event: 'shutdown-forced', signal }));
+      process.exit(1);
+    }, SHUTDOWN_GRACE_MS);
+    forceExit.unref();
+    server.close(err => {
+      clearTimeout(forceExit);
+      process.exit(err ? 1 : 0);
+    });
+  };
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
 }

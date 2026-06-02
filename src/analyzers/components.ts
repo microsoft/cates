@@ -1,6 +1,5 @@
-import { readFile } from 'node:fs/promises';
 import { parse as parseYaml } from 'yaml';
-import type { Finding, AnalyzerOptions } from '../types.js';
+import type { Finding, AnalyzerOptions, AnalyzerFile } from '../types.js';
 import { countTokens } from '../utils/tokenizer.js';
 
 /**
@@ -14,7 +13,7 @@ import { countTokens } from '../utils/tokenizer.js';
  */
 
 export async function analyzePrompts(
-  files: Array<{ path: string; relativePath: string }>,
+  files: AnalyzerFile[],
   _options: AnalyzerOptions,
 ): Promise<Finding[]> {
   const findings: Finding[] = [];
@@ -25,7 +24,7 @@ export async function analyzePrompts(
   if (promptFiles.length === 0) return findings;
 
   for (const file of promptFiles) {
-    const content = await readFile(file.path, 'utf-8');
+    const content = file.content;
     const tokens = countTokens(content);
     const lines = content.split('\n');
 
@@ -112,7 +111,7 @@ export async function analyzePrompts(
  */
 
 export async function analyzeMcp(
-  files: Array<{ path: string; relativePath: string }>,
+  files: AnalyzerFile[],
   _options: AnalyzerOptions,
 ): Promise<Finding[]> {
   const findings: Finding[] = [];
@@ -123,7 +122,7 @@ export async function analyzeMcp(
   if (mcpFiles.length === 0) return findings;
 
   for (const file of mcpFiles) {
-    const content = await readFile(file.path, 'utf-8');
+    const content = file.content;
 
     // Parse JSON or YAML
     let config: unknown;
@@ -230,7 +229,7 @@ export async function analyzeMcp(
  */
 
 export async function analyzeSetupSteps(
-  files: Array<{ path: string; relativePath: string }>,
+  files: AnalyzerFile[],
   _options: AnalyzerOptions,
 ): Promise<Finding[]> {
   const findings: Finding[] = [];
@@ -241,7 +240,7 @@ export async function analyzeSetupSteps(
   if (setupFiles.length === 0) return findings;
 
   for (const file of setupFiles) {
-    const content = await readFile(file.path, 'utf-8');
+    const content = file.content;
     const lines = content.split('\n');
 
     // Check for curl-pipe-bash patterns
@@ -330,7 +329,7 @@ export async function analyzeSetupSteps(
  */
 
 export async function analyzeHooks(
-  files: Array<{ path: string; relativePath: string }>,
+  files: AnalyzerFile[],
   _options: AnalyzerOptions,
 ): Promise<Finding[]> {
   const findings: Finding[] = [];
@@ -341,7 +340,7 @@ export async function analyzeHooks(
   if (hookFiles.length === 0) return findings;
 
   for (const file of hookFiles) {
-    const content = await readFile(file.path, 'utf-8');
+    const content = file.content;
 
     // Check for hooks that might conflict with agent workflows
     if (/interactive|confirm|prompt.*user/i.test(content)) {
@@ -399,7 +398,7 @@ export async function analyzeHooks(
  */
 
 export async function analyzeEditorConfig(
-  files: Array<{ path: string; relativePath: string }>,
+  files: AnalyzerFile[],
   _options: AnalyzerOptions,
 ): Promise<Finding[]> {
   const findings: Finding[] = [];
@@ -408,7 +407,7 @@ export async function analyzeEditorConfig(
   if (editorFiles.length === 0) return findings;
 
   for (const file of editorFiles) {
-    const content = await readFile(file.path, 'utf-8');
+    const content = file.content;
 
     // Only analyze if it has AI-assistant-related settings
     if (!/copilot|github\.copilot/i.test(content)) continue;

@@ -1,0 +1,29 @@
+# Dependabot keeps dependencies (and pinned action SHAs) fresh. For
+# github-actions, Dependabot will rewrite `uses: actions/checkout@v4` to a
+# digest-pinned form once the repo opts in to that policy in repo settings.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+      prod-minor:
+        dependency-type: production
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

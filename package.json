@@ -16,13 +16,13 @@
   },
   "files": [
     "dist",
+    "!dist/**/*.map",
     "README.md",
     "LICENSE",
-    "CATES-v1.0.md",
-    "docs"
+    "CATES-v1.0.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/cli/index.js",
     "build:service": "tsc -p tsconfig.service.json && node -e \"require('fs').cpSync('service/web','dist-service/service/web',{recursive:true})\"",
     "dev": "tsx watch src/cli/index.ts",
     "start": "node dist/cli/index.js",
@@ -31,7 +31,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src/ --ext .ts",
+    "lint": "tsc --noEmit && tsc --noEmit -p tsconfig.service.json",
+    "prepublishOnly": "npm run build && npm test",
     "typecheck": "tsc --noEmit",
     "typecheck:service": "tsc --noEmit -p tsconfig.service.json",
     "typecheck:all": "npm run typecheck && npm run typecheck:service",

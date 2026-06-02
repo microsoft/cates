@@ -1,0 +1,56 @@
+name: trivy-image-scan
+
+# Build the CATES Docker image and scan it for OS + library CVEs on every
+# pull request that touches the Dockerfile or runtime sources. Fails the
+# build on CRITICAL findings so we don't ship a vulnerable image.
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - package.json
+      - package-lock.json
+      - src/**
+      - service/**
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - package.json
+      - package-lock.json
+      - src/**
+      - service/**
+  schedule:
+    - cron: '0 7 * * 1'   # Weekly re-scan against latest CVE feed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t cates-analyzer:scan .
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: cates-analyzer:scan
+          format: sarif
+          output: trivy.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload Trivy results to Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy.sarif

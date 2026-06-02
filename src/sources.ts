@@ -8,6 +8,11 @@ export type ReviewSourceKind = 'local' | 'github';
 export interface ReviewSourceOptions {
   keepWorktree?: boolean;
   preferGh?: boolean;
+  /**
+   * If supplied, the underlying clone/checkout child processes are killed
+   * when the signal aborts. Lets HTTP callers enforce per-request deadlines.
+   */
+  signal?: AbortSignal;
 }
 
 export interface ResolvedReviewSource {
@@ -143,22 +148,22 @@ async function materializeGitHubSource(
   const remote = `https://github.com/${link.owner}/${link.repo}.git`;
 
   try {
-    if (options.preferGh !== false && await commandExists('gh')) {
-      await run('gh', ['repo', 'clone', remote, repoPath, '--', '--depth', '1']);
+    if (options.preferGh !== false && await commandExists('gh', options.signal)) {
+      await run('gh', ['repo', 'clone', remote, repoPath, '--', '--depth', '1'], undefined, options.signal);
     } else {
-      await run('git', ['clone', '--depth', '1', remote, repoPath]);
+      await run('git', ['clone', '--depth', '1', remote, repoPath], undefined, options.signal);
     }
 
     if (link.pullNumber !== undefined) {
-      if (await commandExists('gh')) {
-        await run('gh', ['pr', 'checkout', String(link.pullNumber), '--repo', `${link.owner}/${link.repo}`], repoPath);
+      if (await commandExists('gh', options.signal)) {
+        await run('gh', ['pr', 'checkout', String(link.pullNumber), '--repo', `${link.owner}/${link.repo}`], repoPath, options.signal);
       } else {
-        await run('git', ['fetch', 'origin', `pull/${link.pullNumber}/head:cates-pr-${link.pullNumber}`], repoPath);
-        await run('git', ['checkout', `cates-pr-${link.pullNumber}`], repoPath);
+        await run('git', ['fetch', 'origin', `pull/${link.pullNumber}/head:cates-pr-${link.pullNumber}`], repoPath, options.signal);
+        await run('git', ['checkout', `cates-pr-${link.pullNumber}`], repoPath, options.signal);
       }
     } else if (link.ref) {
-      await run('git', ['fetch', '--depth', '1', 'origin', link.ref], repoPath);
-      await run('git', ['checkout', 'FETCH_HEAD'], repoPath);
+      await run('git', ['fetch', '--depth', '1', 'origin', link.ref], repoPath, options.signal);
+      await run('git', ['checkout', 'FETCH_HEAD'], repoPath, options.signal);
     }
 
     const targetSubpath = link.fileMode && link.subpath ? dirname(link.subpath) : link.subpath;
@@ -205,29 +210,46 @@ async function assertInside(root: string, candidate: string): Promise<void> {
   }
 }
 
-async function commandExists(command: string): Promise<boolean> {
+async function commandExists(command: string, signal?: AbortSignal): Promise<boolean> {
   try {
-    await run(command, ['--version']);
+    await run(command, ['--version'], undefined, signal);
     return true;
   } catch {
     return false;
   }
 }
 
-function run(command: string, args: string[], cwd?: string): Promise<void> {
+function run(command: string, args: string[], cwd?: string, signal?: AbortSignal): Promise<void> {
   return new Promise((resolveRun, reject) => {
+    if (signal?.aborted) {
+      reject(new Error(`${command} aborted before start`));
+      return;
+    }
     const child = spawn(command, args, {
       cwd,
       stdio: ['ignore', 'ignore', 'pipe'],
       shell: false,
     });
 
+    const onAbort = () => {
+      child.kill('SIGTERM');
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+
     let stderr = '';
     child.stderr.on('data', chunk => {
       stderr += String(chunk);
     });
-    child.on('error', reject);
+    child.on('error', err => {
+      signal?.removeEventListener('abort', onAbort);
+      reject(err);
+    });
     child.on('close', code => {
+      signal?.removeEventListener('abort', onAbort);
+      if (signal?.aborted) {
+        reject(new Error(`${command} aborted: deadline exceeded`));
+        return;
+      }
       if (code === 0) {
         resolveRun();
       } else {

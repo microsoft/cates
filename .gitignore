@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-service/
 coverage/
 src/**/*.js
 src/**/*.js.map
@@ -8,6 +9,10 @@ src/**/*.d.ts.map
 *.tgz
 .env
 .DS_Store
+
+# Local scan artifacts (use reports/ folder for retained reports)
+*-cates-report.json
+*-cates-report.txt
 
 # Ad-hoc screenshots / pasted images (never commit)
 image.png

@@ -23,7 +23,7 @@ import type { AnalysisResult, AnalyzerOptions } from '../../src/types.js';
 
 export type HandlerResult<T> =
   | { ok: true; status: 200; body: T }
-  | { ok: false; status: 400 | 413 | 422 | 500 | 502; body: { error: string; details?: unknown } };
+  | { ok: false; status: 400 | 413 | 422 | 500 | 502 | 504; body: { error: string; details?: unknown } };
 
 export async function handleAnalyze(rawBody: unknown): Promise<HandlerResult<AnalysisResult>> {
   const parsed = AnalyzeRequestSchema.safeParse(rawBody);
@@ -69,10 +69,14 @@ async function runAnalyzeInMemory(req: AnalyzeRequest): Promise<HandlerResult<An
   }
 }
 
+const SCAN_TIMEOUT_MS = Number(process.env.CATES_SCAN_TIMEOUT_MS) || 60_000;
+
 async function runScan(req: ScanRequest): Promise<HandlerResult<AnalysisResult>> {
   let cleanup: (() => Promise<void>) | undefined;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
   try {
-    const resolved = await resolveReviewSource(req.url, { preferGh: false });
+    const resolved = await resolveReviewSource(req.url, { preferGh: false, signal: controller.signal });
     cleanup = resolved.cleanup;
     const policyOptions = applyPolicy(req.policy);
     const options: Parameters<typeof analyze>[0] = {
@@ -88,11 +92,15 @@ async function runScan(req: ScanRequest): Promise<HandlerResult<AnalysisResult>>
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    if (controller.signal.aborted) {
+      return { ok: false, status: 504, body: { error: 'Scan timed out', details: `Exceeded ${SCAN_TIMEOUT_MS}ms deadline` } };
+    }
     if (/unsafe (git ref|GitHub|subpath)/i.test(message) || /Invalid GitHub/i.test(message)) {
       return badRequest('Invalid GitHub URL', message);
     }
     return { ok: false, status: 502, body: { error: 'Scan failed', details: message } };
   } finally {
+    clearTimeout(timer);
     if (cleanup) await cleanup().catch(() => undefined);
   }
 }

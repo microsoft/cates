@@ -46,11 +46,27 @@ cates-analyzer . --format json
 # SARIF output for code scanning systems
 cates-analyzer . --format sarif
 
-# Review a GitHub repository, branch folder, file, or pull request
-cates-analyzer review https://github.com/OWNER/REPO
-cates-analyzer review https://github.com/OWNER/REPO/tree/main/path/to/folder
-cates-analyzer review https://github.com/OWNER/REPO/pull/123
+# GitHub repo, branch folder, file, or pull request
+# (auto-detected — also works as `cates-analyzer review <url>`)
+cates-analyzer https://github.com/OWNER/REPO
+cates-analyzer https://github.com/OWNER/REPO/tree/main/path/to/folder
+cates-analyzer https://github.com/OWNER/REPO/pull/123
+
+# Quieter pretty output (drops the banner; keeps all data)
+cates-analyzer . --quiet
+
+# Shell completion
+cates-analyzer completion bash > /usr/local/etc/bash_completion.d/cates-analyzer
+cates-analyzer completion zsh  > "${fpath[1]}/_cates-analyzer"
 ```
+
+Exit codes:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Analysis succeeded; all CI gates passed |
+| `1` | CATES gate failed (`--min-score`, `--require-level`, `--fail-on`, `--max-always-loaded`, or conformance) |
+| `2` | Usage error (invalid flag, missing argument, parse failure) |
 
 When running from this source checkout before publishing/installing the package, use one of these forms:
 

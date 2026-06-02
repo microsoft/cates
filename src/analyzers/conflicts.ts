@@ -1,5 +1,4 @@
-import { readFile } from 'node:fs/promises';
-import type { Finding, AnalyzerOptions } from '../types.js';
+import type { Finding, AnalyzerOptions, AnalyzerFile } from '../types.js';
 
 /**
  * Conflict & Reachability Analyzer
@@ -9,7 +8,7 @@ import type { Finding, AnalyzerOptions } from '../types.js';
  */
 
 export async function analyzeConflicts(
-  files: Array<{ path: string; relativePath: string }>,
+  files: AnalyzerFile[],
   _options: AnalyzerOptions,
 ): Promise<Finding[]> {
   const findings: Finding[] = [];
@@ -17,8 +16,7 @@ export async function analyzeConflicts(
   const allInstructions: Array<{ text: string; file: string; line: number }> = [];
 
   for (const file of files) {
-    const content = await readFile(file.path, 'utf-8');
-    const lines = content.split('\n');
+    const lines = file.content.split('\n');
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!.trim();
@@ -29,7 +27,7 @@ export async function analyzeConflicts(
   }
 
   findings.push(...checkContradictions(allInstructions));
-  findings.push(...await checkHarnessQuality(files));
+  findings.push(...checkHarnessQuality(files));
 
   return findings;
 }
@@ -116,13 +114,10 @@ const HARNESS_CHECKS = [
   },
 ];
 
-async function checkHarnessQuality(files: Array<{ path: string; relativePath: string }>): Promise<Finding[]> {
+function checkHarnessQuality(files: AnalyzerFile[]): Finding[] {
   const findings: Finding[] = [];
 
-  let allContent = '';
-  for (const file of files) {
-    allContent += '\n' + await readFile(file.path, 'utf-8');
-  }
+  const allContent = files.map(f => f.content).join('\n');
 
   const missing = HARNESS_CHECKS.filter(check =>
     !check.patterns.some(p => p.test(allContent))

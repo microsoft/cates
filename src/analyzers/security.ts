@@ -1,6 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import type { Finding, AnalyzerOptions } from '../types.js';
+import type { Finding, AnalyzerOptions, AnalyzerFile } from '../types.js';
 import { countTokens } from '../utils/tokenizer.js';
+import { isScannableLine } from '../utils/regex-guards.js';
 
 /**
  * Security Analyzer
@@ -15,14 +15,13 @@ import { countTokens } from '../utils/tokenizer.js';
  */
 
 export async function analyzeSecurity(
-  files: Array<{ path: string; relativePath: string }>,
+  files: AnalyzerFile[],
   _options: AnalyzerOptions,
 ): Promise<Finding[]> {
   const findings: Finding[] = [];
 
   for (const file of files) {
-    const content = await readFile(file.path, 'utf-8');
-    const lines = content.split('\n');
+    const lines = file.content.split('\n');
 
     findings.push(...checkSecrets(lines, file.relativePath));
     findings.push(...checkPromptInjectionVectors(lines, file.relativePath));
@@ -54,6 +53,7 @@ function checkSecrets(lines: string[], file: string): Finding[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+    if (!isScannableLine(line)) continue; // ReDoS guard: skip pathologically long lines
     // Skip lines that are clearly examples or placeholders
     if (/\b(example|placeholder|your-|xxx|TODO|REPLACE)\b/i.test(line)) continue;
 
@@ -97,6 +97,7 @@ function checkPromptInjectionVectors(lines: string[], file: string): Finding[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+    if (!isScannableLine(line)) continue;
     for (const { pattern, label } of injectionPatterns) {
       if (pattern.test(line)) {
         findings.push({
@@ -135,6 +136,7 @@ function checkOverlyPermissive(lines: string[], file: string): Finding[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+    if (!isScannableLine(line)) continue;
     for (const { pattern, label } of permissivePatterns) {
       if (pattern.test(line)) {
         findings.push({
@@ -186,6 +188,7 @@ function checkSystemPromptLeakage(lines: string[], file: string): Finding[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+    if (!isScannableLine(line)) continue;
     for (const { pattern, label } of leakagePatterns) {
       if (pattern.test(line)) {
         findings.push({
@@ -222,6 +225,7 @@ function checkUnsafePatterns(lines: string[], file: string): Finding[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+    if (!isScannableLine(line)) continue;
     for (const { pattern, label } of unsafePatterns) {
       if (pattern.test(line)) {
         findings.push({

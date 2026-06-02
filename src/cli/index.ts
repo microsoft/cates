@@ -18,7 +18,32 @@ import type { AnalysisResult, Severity } from '../types.js';
 program
   .name('cates-analyzer')
   .description('Analyze coding agent configurations for token efficiency, security, and CATES conformance')
-  .version('1.0.0');
+  .version('1.0.0')
+  .addHelpText('after', `
+Exit codes:
+  0  Analysis succeeded and all CI gates passed
+  1  CATES gate failure (min-score, require-level, fail-on, max-always-loaded, or conformance level)
+  2  Usage error (invalid flag, missing argument, parse failure)
+
+Examples:
+  $ cates-analyzer .                                        # analyze current dir
+  $ cates-analyzer ../my-repo --format json                 # JSON output
+  $ cates-analyzer https://github.com/OWNER/REPO            # GitHub repo (auto-detected)
+  $ cates-analyzer https://github.com/OWNER/REPO/pull/123   # pull request
+  $ cates-analyzer demo --category microsoft --limit 10     # built-in demo set
+  $ cates-analyzer completion bash                          # shell completion
+`);
+
+program.exitOverride((err) => {
+  // Map commander's usage errors to exit code 2 instead of the default 1
+  // so users (and CI) can distinguish "you typed it wrong" from "your config
+  // failed a CATES gate". `commander.helpDisplayed` and `commander.version`
+  // are normal terminations and should still exit 0.
+  if (err.code === 'commander.helpDisplayed' || err.code === 'commander.version' || err.code === 'commander.help') {
+    process.exit(0);
+  }
+  process.exit(2);
+});
 
 program
   .command('demo')
@@ -38,6 +63,7 @@ program
   .description('Analyze one repository')
   .argument('[path]', 'Path to repository root', '.')
   .option('-f, --format <format>', 'Output format: pretty, json, sarif', 'pretty')
+  .option('-q, --quiet', 'Suppress pretty-format headers; print only the data section')
   .option('--demo', 'Run demo scan instead of analyzing a path')
   .option('--repos-file <path>', 'Demo mode: text file of repositories to scan')
   .option('--category <list>', 'Demo mode: comma-separated categories: microsoft,github,claude,open-source')
@@ -192,6 +218,12 @@ async function runAnalyze(path: string, opts: Record<string, unknown>): Promise<
     await runDemoCommand(opts);
     return;
   }
+  // Auto-dispatch GitHub URLs (and other URL-style sources) to the review
+  // pipeline so users don't have to remember which subcommand to use.
+  if (looksLikeUrl(path)) {
+    await runReview(path, opts);
+    return;
+  }
   const repoPath = resolve(path);
   try {
     const exitCode = await executeAnalyze(repoPath, opts);
@@ -200,6 +232,10 @@ async function runAnalyze(path: string, opts: Record<string, unknown>): Promise<
     console.error('Error:', err instanceof Error ? err.message : err);
     process.exit(1);
   }
+}
+
+function looksLikeUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
 }
 
 async function runDemoCommand(opts: Record<string, unknown>): Promise<void> {
@@ -260,9 +296,16 @@ async function executeAnalyze(repoPath: string, opts: Record<string, unknown>, d
   }
 
   const reportResult = displayPath ? { ...result, repoPath: displayPath } : result;
-  process.stdout.write(createReport(reportResult, format) + '\n');
+  const reportText = createReport(reportResult, format);
+  process.stdout.write((opts.quiet ? stripPrettyBanner(reportText) : reportText) + '\n');
 
   return evaluateResultGates(result, policy, opts);
+}
+
+function stripPrettyBanner(text: string): string {
+  // Drop the opening ASCII-art banner block when --quiet is set so output is
+  // ready for piping/diffing while still containing all data sections.
+  return text.replace(/^\n*╔[\s\S]*?╝\n+/, '');
 }
 
 function buildAnalyzeOptions(
@@ -480,4 +523,74 @@ function tokenizerListOpt(value: unknown): TokenizerId[] | undefined {
   return values.filter(isTokenizerId);
 }
 
+program
+  .command('completion')
+  .description('Print a shell completion script (bash or zsh)')
+  .argument('[shell]', 'Shell to generate completion for: bash or zsh', 'bash')
+  .action((shell: string) => {
+    const target = shell.toLowerCase();
+    if (target !== 'bash' && target !== 'zsh') {
+      console.error(`Unsupported shell: ${shell}. Use 'bash' or 'zsh'.`);
+      process.exit(2);
+    }
+    process.stdout.write(buildCompletionScript(target));
+  });
+
 program.parse();
+
+function buildCompletionScript(shell: 'bash' | 'zsh'): string {
+  const subcommands = ['analyze', 'review', 'demo', 'portfolio', 'conformance', 'rules', 'explain', 'tokenizers', 'completion', 'help'];
+  const flags = [
+    '--format', '--quiet', '--policy', '--max-files', '--max-depth', '--files', '--individual',
+    '--no-evidence', '--min-score', '--require-level', '--fail-on', '--max-always-loaded',
+    '--tokenizer', '--compare-tokenizers', '--fix', '--fix-dry-run', '--demo', '--repos-file',
+    '--category', '--limit', '--concurrency', '--keep-worktree', '--no-gh', '--fail-fast',
+    '--help', '--version',
+  ];
+
+  if (shell === 'bash') {
+    return `# cates-analyzer bash completion. Install with:
+#   cates-analyzer completion bash > /usr/local/etc/bash_completion.d/cates-analyzer
+# or eval directly in ~/.bashrc:
+#   eval "$(cates-analyzer completion bash)"
+_cates_analyzer() {
+  local cur prev words cword
+  _init_completion || return
+  local subcommands="${subcommands.join(' ')}"
+  local flags="${flags.join(' ')}"
+  if [[ $cword -eq 1 ]]; then
+    COMPREPLY=( $(compgen -W "$subcommands" -- "$cur") )
+    return
+  fi
+  if [[ "$cur" == -* ]]; then
+    COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
+    return
+  fi
+  COMPREPLY=( $(compgen -f -- "$cur") )
+}
+complete -F _cates_analyzer cates-analyzer
+`;
+  }
+
+  return `# cates-analyzer zsh completion. Install with:
+#   cates-analyzer completion zsh > "\${fpath[1]}/_cates-analyzer"
+# or eval in ~/.zshrc:
+#   eval "$(cates-analyzer completion zsh)"
+#compdef cates-analyzer
+_cates_analyzer() {
+  local -a subcommands flags
+  subcommands=(${subcommands.map(c => `'${c}'`).join(' ')})
+  flags=(${flags.map(f => `'${f}'`).join(' ')})
+  if (( CURRENT == 2 )); then
+    _describe -t commands 'cates-analyzer subcommand' subcommands
+    return
+  fi
+  if [[ "$words[CURRENT]" == -* ]]; then
+    _describe -t flags 'flag' flags
+    return
+  fi
+  _files
+}
+compdef _cates_analyzer cates-analyzer
+`;
+}
