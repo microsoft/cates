@@ -65,7 +65,7 @@
   "dependencies": {
     "@anthropic-ai/tokenizer": "^0.0.4",
     "chalk": "^5.4.1",
-    "commander": "^13.1.0",
+    "commander": "^15.0.0",
     "express": "^5.2.1",
     "helmet": "^8.1.0",
     "js-tiktoken": "^1.0.18",
