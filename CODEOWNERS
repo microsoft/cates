@@ -1,0 +1,5 @@
+# Code owners for cates-analyzer
+# These owners will be the default owners for everything in the repo.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+
+*       @msfttoler
