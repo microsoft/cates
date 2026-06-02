@@ -67,10 +67,10 @@
     "chalk": "^5.4.1",
     "commander": "^15.0.0",
     "express": "^5.2.1",
-    "helmet": "^8.1.0",
+    "helmet": "^8.2.0",
     "js-tiktoken": "^1.0.18",
     "ora": "^9.4.0",
-    "yaml": "^2.7.1",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
