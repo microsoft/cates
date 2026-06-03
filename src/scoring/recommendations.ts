@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import type { Finding, Recommendation, DiscoveryResult } from '../types.js';
 
 /**

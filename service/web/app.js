@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
   const tabs = document.querySelectorAll('.tabs button');
   const panels = {
     paste: document.getElementById('paste-panel'),

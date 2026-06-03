@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import type { Dimension, Severity } from '../types.js';
 
 export interface RuleMetadata {

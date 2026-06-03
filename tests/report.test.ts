@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { describe, it, expect } from 'vitest';
 import { createReport } from '../src/scoring/report.js';
 import type { AnalysisResult, Finding, Recommendation } from '../src/types.js';
@@ -140,6 +142,76 @@ describe('createReport', () => {
       r.suppressionSummary = { active: 1, expired: 2, suppressedFindings: 3 };
       const text = createReport(r, 'pretty');
       expect(text).toMatch(/Suppressions: 3 finding\(s\) hidden, 2 expired/);
+    });
+
+    it('renders optional pretty-report sections when data is present', () => {
+      const r = syntheticResult({
+        recs: [
+          {
+            priority: 1,
+            title: 'Split scoped guidance',
+            description: 'Move rarely used guidance into scoped files.',
+            tokenSavings: 1200,
+            effort: 'easy',
+            ruleIds: ['TE001'],
+            files: ['AGENTS.md'],
+            safety: 'safe',
+            autofixable: false,
+          },
+        ],
+        grade: 'C',
+      });
+      r.discovery.files = [
+        ...r.discovery.files,
+        {
+          path: '/tmp/cates-report-test/.claude/settings.json',
+          relativePath: '.claude/settings.json',
+          type: 'editor-config',
+          scope: 'conditional',
+          sizeBytes: 50,
+          tokenCount: 10,
+          isActive: true,
+        },
+        {
+          path: '/tmp/cates-report-test/.mcp.json',
+          relativePath: '.mcp.json',
+          type: 'mcp-config',
+          scope: 'conditional',
+          sizeBytes: 50,
+          tokenCount: 10,
+          isActive: true,
+        },
+        {
+          path: '/tmp/cates-report-test/.github/prompts/review.md',
+          relativePath: '.github/prompts/review.md',
+          type: 'prompt-file',
+          scope: 'on-demand',
+          sizeBytes: 50,
+          tokenCount: 10,
+          isActive: true,
+        },
+      ];
+      r.discovery.conditionalTokens = 20;
+      r.discovery.deadFileTokens = 5;
+      r.discovery.totalTokensByTokenizer = {
+        'openai-cl100k': 80,
+        approx: 100,
+      } as typeof r.discovery.totalTokensByTokenizer;
+      r.savings = {
+        conservativeTokensPerInvocation: 100,
+        conservativePercentage: 12.5,
+        projectedTokensPerInvocation: 300,
+        projectedPercentage: 37.5,
+      };
+
+      const text = createReport(r, 'pretty');
+      expect(text).toContain('Tokenizer Comparison');
+      expect(text).toContain('20 tokens conditional');
+      expect(text).toContain('5 tokens in dead/unreachable files');
+      expect(text).toContain('Split scoped guidance (~1,200 tokens/invocation)');
+      expect(text).toContain('Claude');
+      expect(text).toContain('MCP');
+      expect(text).toContain('Prompts');
     });
   });
 });

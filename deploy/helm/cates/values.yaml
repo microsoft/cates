@@ -5,14 +5,14 @@
 mode: cronjob
 
 image:
-  repository: ghcr.io/microsoft/cates
+  repository: cates-analyzer
   tag: ""              # defaults to .Chart.AppVersion when empty
   pullPolicy: IfNotPresent
   pullSecrets: []      # [{ name: ghcr-creds }]
 
 # Arguments passed to the cates-analyzer CLI.
 # Examples:
-#   ["demo", "--category", "microsoft", "--limit", "25", "--format", "json"]
+#   ["demo", "--repos-file", "/etc/cates/repos.txt", "--limit", "25", "--format", "json"]
 #   ["review", "https://github.com/owner/repo", "--format", "sarif"]
 args:
   - "demo"
@@ -38,10 +38,10 @@ job:
   parallelism: 1
   completions: 1
 
-# GitHub auth. Provide ONE of:
+# Repository host auth. Provide ONE of:
 #   1) githubToken.value            - raw token (creates a Secret; fine for dev)
 #   2) githubToken.existingSecret   - reference an existing Secret + key
-#   3) githubToken.workloadIdentity - use AKS Workload Identity (no token)
+#   3) githubToken.workloadIdentity - use workload identity (no token)
 githubToken:
   value: ""
   existingSecret: ""
@@ -56,7 +56,6 @@ githubToken:
 policy:
   enabled: false
   content: |
-    # See https://github.com/microsoft/cates for the policy schema.
     version: 1
     severityThreshold: high
 
@@ -64,7 +63,7 @@ policy:
 # Mounted at /etc/cates/repos.txt.
 repos:
   enabled: false
-  content: ""          # newline-separated GitHub URLs
+  content: ""          # newline-separated repository URLs
 
 # Optional persistent storage for reports. When disabled the container
 # writes to an emptyDir that is discarded after the Job completes.

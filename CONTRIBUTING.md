@@ -5,19 +5,14 @@ propose changes and the legal requirements for contribution.
 
 ## Contributor License Agreement (CLA)
 
-This project welcomes contributions and suggestions. Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit <https://cla.opensource.microsoft.com>.
-
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the
-instructions provided by the bot. You will only need to do this once across all repos using our CLA.
+All contributions must be made subject to Microsoft's Contributor License Agreement ("CLA"). When
+you submit a pull request on GitHub, the CLA check will determine whether you need to sign the CLA
+and will provide instructions. If contributing outside GitHub, sign the Microsoft CLA before
+submitting your contribution.
 
 ## Code of Conduct
 
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/)
-or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
 ## Reporting security issues
 
@@ -60,8 +55,3 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/) where reason
 (e.g., `feat:`, `fix:`, `chore:`, `docs:`, `perf:`, `refactor:`, `test:`). This repository uses
 [release-please](https://github.com/googleapis/release-please) to automate releases from
 conventional commits.
-
-## Trademarks
-
-See the **Trademarks** section in the [README](README.md#trademarks) for the policy on use of
-Microsoft trademarks and logos.

@@ -38,7 +38,7 @@ FROM ${NODE_IMAGE} AS runtime
 
 # Runtime tools cates shells out to:
 #   git        - clone repos for review
-#   github-cli - preferred clone path (auth via GH_TOKEN)
+#   github-cli - preferred clone path when available
 #   ca-certs   - HTTPS to github.com
 #   tini       - PID 1 to reap zombies (matters in k8s Jobs)
 RUN apk add --no-cache git github-cli ca-certificates tini \
@@ -77,6 +77,5 @@ CMD ["--help"]
 # OCI labels for traceability.
 LABEL org.opencontainers.image.title="cates-analyzer" \
       org.opencontainers.image.description="Analyze coding agent configurations for token efficiency, security, and CATES conformance" \
-      org.opencontainers.image.source="https://github.com/microsoft/cates" \
-      org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.vendor="Microsoft"
+      org.opencontainers.image.source="" \
+      org.opencontainers.image.licenses="MIT"

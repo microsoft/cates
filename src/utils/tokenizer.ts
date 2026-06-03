@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { getEncoding } from 'js-tiktoken';
 import { countTokens as countClaudeTokens } from '@anthropic-ai/tokenizer';
 import { AsyncLocalStorage } from 'node:async_hooks';

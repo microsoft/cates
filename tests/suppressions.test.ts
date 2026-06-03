@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { describe, it, expect } from 'vitest';
 import { applySuppressions } from '../src/suppressions.js';
 import type { Finding, Suppression } from '../src/types.js';

@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import type { AnalyzerOptions, AnalysisResult, AnalyzerFile, Finding } from '../types.js';
 import { AnalyzerOptionsSchema } from '../types.js';
 import { withTokenizer, getDefaultTokenizer } from '../utils/tokenizer.js';

@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import type { Finding, Score, DimensionScore, Dimension, DiscoveryResult } from '../types.js';
 
 const DIMENSION_WEIGHTS: Record<Dimension, number> = {

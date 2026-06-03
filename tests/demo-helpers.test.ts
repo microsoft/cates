@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -14,15 +16,29 @@ describe('demo helpers via getDemoRepositories', () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it('returns the default 100-repository manifest when no reposFile is given', async () => {
+  it('has no embedded default repository manifest', async () => {
     const repos = await getDemoRepositories();
-    expect(repos.length).toBeGreaterThan(50);
+    expect(repos).toEqual([]);
   });
 
   it('filters by category when specified', async () => {
-    const repos = await getDemoRepositories({ categories: ['microsoft'] });
-    expect(repos.every(r => r.category === 'microsoft')).toBe(true);
-    expect(repos.length).toBeGreaterThan(0);
+    const file = join(dir, 'repos.txt');
+    await writeFile(
+      file,
+      [
+        'sample https://github.com/example/repo-one',
+        'other https://github.com/example/repo-two',
+      ].join('\n'),
+    );
+    const repos = await getDemoRepositories({ reposFile: file, categories: ['sample'] });
+    expect(repos).toEqual([
+      {
+        category: 'sample',
+        owner: 'example',
+        repo: 'repo-one',
+        url: 'https://github.com/example/repo-one',
+      },
+    ]);
   });
 
   it('parses a reposFile with category-prefixed lines, plain URLs, comments, and blanks', async () => {
@@ -32,17 +48,17 @@ describe('demo helpers via getDemoRepositories', () => {
       [
         '# This is a comment',
         '',
-        'microsoft https://github.com/microsoft/vscode',
-        'https://github.com/openai/openai-python',
+        'sample https://github.com/example/repo-one',
+        'https://github.com/example/repo-two',
         '   ',
-        'github https://github.com/github/docs',
+        'other https://github.com/example/repo-three',
       ].join('\n'),
     );
     const repos = await getDemoRepositories({ reposFile: file });
     expect(repos).toHaveLength(3);
-    expect(repos[0]).toMatchObject({ category: 'microsoft', owner: 'microsoft', repo: 'vscode' });
-    expect(repos[1]).toMatchObject({ category: 'custom', owner: 'openai', repo: 'openai-python' });
-    expect(repos[2]).toMatchObject({ category: 'github', owner: 'github', repo: 'docs' });
+    expect(repos[0]).toMatchObject({ category: 'sample', owner: 'example', repo: 'repo-one' });
+    expect(repos[1]).toMatchObject({ category: 'custom', owner: 'example', repo: 'repo-two' });
+    expect(repos[2]).toMatchObject({ category: 'other', owner: 'example', repo: 'repo-three' });
   });
 
   it('throws a line-numbered error when a URL is unparseable', async () => {

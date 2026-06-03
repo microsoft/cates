@@ -3,13 +3,13 @@ mode: cronjob
 schedule: "0 6 * * 1-5"   # weekdays 06:00 UTC
 
 image:
-  repository: ghcr.io/microsoft/cates
+  repository: cates-analyzer
   tag: "1.0.0"
 
 args:
   - "demo"
-  - "--category"
-  - "microsoft,github"
+  - "--repos-file"
+  - "/etc/cates/repos.txt"
   - "--limit"
   - "50"
   - "--format"
@@ -18,6 +18,11 @@ args:
 githubToken:
   existingSecret: cates-gh
   existingSecretKey: token
+
+repos:
+  enabled: true
+  content: |
+    # Add repository URLs here, one per line.
 
 resources:
   requests: { cpu: 250m, memory: 512Mi }

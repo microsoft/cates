@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -252,7 +254,7 @@ describe('loadPolicy', () => {
       const payload = {
         suppressions: [
           { ruleId: 'SEC001', reason: 'documented' },
-          { ruleId: 'SEC002', reason: 'covered by GHAS', file: 'foo.md', expires: '2030-01-01', owner: '@team' },
+          { ruleId: 'SEC002', reason: 'covered by approved scanner', file: 'foo.md', expires: '2030-01-01', owner: '@team' },
           { ruleId: '', reason: 'empty id' },
           { reason: 'missing id' },
           { ruleId: 'OK', reason: '' },

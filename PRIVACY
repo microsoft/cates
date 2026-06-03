@@ -1,0 +1,9 @@
+# Privacy and Telemetry
+
+CATES Configuration Analyzer does not collect telemetry and does not send usage
+data or analyzed content to Microsoft. The analyzer runs locally or inside the
+service process, and submitted content is discarded after analysis.
+
+If telemetry is added in a future release, this file must be updated with the
+required Microsoft data collection notice and clear instructions for disabling
+telemetry.

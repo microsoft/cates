@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import type { AnalysisResult, Severity } from './types.js';
 import type { CatesPolicy } from './policy.js';
 

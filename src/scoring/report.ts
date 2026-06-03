@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import type { AnalysisResult } from '../types.js';
 import { getRule } from '../rules/catalog.js';
 

@@ -25,7 +25,7 @@ npm install --save-dev cates-analyzer
 npx cates-analyzer .
 
 # 4) Run it in Docker (no Node.js required locally)
-docker run --rm -v "$PWD:/work" ghcr.io/microsoft/cates:latest .
+docker run --rm -v "$PWD:/work" cates-analyzer:latest .
 ```
 
 Requires Node.js **>= 20** for the npm install paths. The Docker image
@@ -46,7 +46,7 @@ cates-analyzer . --format json
 # SARIF output for code scanning systems
 cates-analyzer . --format sarif
 
-# GitHub repo, branch folder, file, or pull request
+# Repository URL, branch folder, file, or pull request
 # (auto-detected — also works as `cates-analyzer review <url>`)
 cates-analyzer https://github.com/OWNER/REPO
 cates-analyzer https://github.com/OWNER/REPO/tree/main/path/to/folder
@@ -104,13 +104,13 @@ docker run --rm -v "$PWD:/work" cates-analyzer . --format json > report.json
 Windows PowerShell users substitute `${PWD}` for `$PWD`.
 
 The image runs as a non-root user, uses a read-only root filesystem, and
-ships with `tini` as PID 1 so it behaves cleanly under Kubernetes/ACA.
+ships with `tini` as PID 1 so it behaves cleanly under container orchestrators.
 
-## ☸️ Kubernetes / AKS (Helm chart)
+## ☸️ Helm chart
 
 The chart in [`deploy/helm/cates`](deploy/helm/cates/README.md) deploys
-CATES as a `CronJob` (default) or one-shot `Job`. It supports AKS
-Workload Identity, NetworkPolicies, a persistent reports volume, and a
+CATES as a `CronJob` (default) or one-shot `Job`. It supports
+NetworkPolicies, a persistent reports volume, and a
 ConfigMap-mounted `.cates.yml` policy.
 
 ```bash
@@ -123,20 +123,6 @@ helm install cates ./deploy/helm/cates \
 
 See [`deploy/helm/cates/README.md`](deploy/helm/cates/README.md) for
 production values, Workload Identity setup, and PVC-backed reports.
-
-## ☁️ Azure Container Apps
-
-For a server-less, no-cluster deployment, run CATES as an **ACA Job**:
-
-```bash
-az deployment group create \
-  -g rg-cates \
-  -f deploy/aca/cates-job.bicep \
-  -p image=ghcr.io/microsoft/cates:1.0.0 githubToken=$GH_TOKEN
-```
-
-Schedule, manual, and event-triggered modes are all supported. Full
-walkthrough in [`deploy/aca/README.md`](deploy/aca/README.md).
 
 ## 🌐 CATES Service (hosted UI + HTTP API)
 
@@ -225,49 +211,6 @@ docker run --rm -p 8080:8080 cates \
   node /app/dist-service/service/server.js
 ```
 
-### Deployment targets
-
-The service is **deployable** to either Azure Container Apps or Azure App
-Service. Both targets share the same container image (so the same
-artifact runs anywhere). **No CI workflow auto-deploys** — pick a target
-and run the `az deployment group create` command yourself when you want
-a deployment to happen.
-
-#### Option A — Azure Container Apps (recommended for scale-to-zero)
-
-```bash
-az group create -n rg-cates -l eastus2
-az deployment group create -g rg-cates \
-  -f deploy/aca/cates-service.bicep \
-  -p image=ghcr.io/microsoft/cates:latest
-```
-
-Scale-to-zero on idle, HTTP-concurrency autoscaling, free TLS, liveness
-and readiness probes wired to `/api/healthz` and `/api/readyz`. Full
-detail in [`deploy/aca/cates-service.bicep`](deploy/aca/cates-service.bicep).
-
-#### Option B — Azure App Service (Web App for Containers)
-
-```bash
-az group create -n rg-cates -l eastus2
-az deployment group create -g rg-cates \
-  -f deploy/appservice/cates-service.bicep \
-  -p image=ghcr.io/microsoft/cates:latest
-```
-
-Linux Web App on an App Service Plan (defaults to the cheapest always-on
-`B1` SKU). HTTPS-only, HTTP/2, TLS 1.2 minimum, FTPS disabled,
-`healthCheckPath` set to `/api/healthz`. Full detail in
-[`deploy/appservice/README.md`](deploy/appservice/README.md).
-
-#### Pick one
-
-| Pick App Service when… | Pick ACA when… |
-| --- | --- |
-| Your org already uses App Service / has an existing plan | You want true scale-to-zero on idle |
-| You need slots, Easy Auth, or App Service Environment | You want event-driven scaling on HTTP concurrency |
-| You're more comfortable with App Service operations | You prefer Container Apps' revisions model |
-
 ### Rule &amp; dimension toggles in the UI
 
 The hosted UI ships with a **toggle drawer** at the top of the page that
@@ -275,7 +218,7 @@ fetches `GET /api/rules` and lets you:
 
 - Disable any individual rule (single-click on the rule pill)
 - Disable an entire dimension (click the dimension button — e.g.
-  "security" if you're a GHAS customer)
+  "security" if you already enforce those checks elsewhere)
 - Override severity per rule
 - Export the current state as `.cates.yml` for committing to your repo
 
@@ -300,20 +243,20 @@ score updates immediately and the result includes `disabledRuleIds` /
 |---|---|
 | **Zero-LLM static analysis** | Deterministic, fast, no API keys, no data exfiltration |
 | **42 rules** across 6 dimensions | Token efficiency, security, specificity, completeness, conflict/reachability, harness quality |
-| **Per-family tokenizers** | OpenAI `cl100k`, OpenAI `o200k`, Anthropic Claude, or an offline approximation — pick one or compare side-by-side |
+| **Per-family tokenizers** | Model-family tokenizers or an offline approximation — pick one or compare side-by-side |
 | **Multi-surface discovery** | Instructions, prompt libraries, MCP configs, hooks, setup steps, editor settings |
 | **Configurable** | Toggle any rule or whole dimension on/off, override severities, suppress with reasons + expirations |
-| **Multiple output formats** | Human-readable text, JSON, **SARIF** for GitHub Advanced Security and other scanners |
+| **Multiple output formats** | Human-readable text, JSON, **SARIF** for code scanning systems |
 | **CI-ready gates** | `--min-score`, `--require-level`, `--fail-on`, `--max-always-loaded` |
 | **Conformance levels** | Score against CATES Level 1, 2, or 3 |
-| **GitHub-native review** | `cates-analyzer review <url>` for repos, branches, folders, files, or PRs (uses local `gh` credentials) |
+| **Repository review** | `cates-analyzer review <url>` for repos, branches, folders, files, or PRs |
 | **Hosted service + HTTP API** | Paste / scan / programmatic access via the [CATES Service](#-cates-service-hosted-ui--http-api) — same engine, no install |
 | **Portfolio scanning** | Roll up many repos into one report |
-| **Demo mode** | 100-repo built-in manifest (Microsoft, GitHub, Anthropic, broader OSS) |
+| **Demo mode** | Scan repositories supplied through a custom manifest |
 | **Safe autofix** | `--fix` / `--fix-dry-run` for mechanical, reviewable changes |
 | **Token economics** | Per-finding token impact + conservative and projected savings estimates |
 | **Hardened runtime** | Sandboxed reads, argv-injection guards, size/depth limits, binary detection, no network calls in analyze mode |
-| **Multiple ship targets** | npm CLI, Docker image, Helm chart for AKS, Bicep templates for Azure Container Apps and Azure App Service (manual deploy — no CI auto-deploy) |
+| **Multiple ship targets** | npm CLI, Docker image, Helm chart, and local HTTP service |
 
 ## ⚙️ Configuring CATES
 
@@ -340,7 +283,7 @@ maxAlwaysLoadedTokens: 1500
 
 # ─── Whole-dimension toggles ─────────────────────────────────────────
 # Disable an entire category of rules in one line. Useful when another
-# tool already covers it (e.g., GHAS for secret scanning / code scanning).
+# tool already covers it (e.g., another approved scanner owns these checks).
 dimensions:
   security: off              # skip CATES SEC* and security-tagged MCP/STP rules
   # token-efficiency: off
@@ -378,8 +321,8 @@ The same shape works as JSON:
 }
 ```
 
-> **Tip — GHAS users:** set `dimensions.security: off` and let GitHub
-> Advanced Security own secret scanning and code scanning. CATES will
+> **Tip:** set `dimensions.security: off` when another approved scanner owns
+> secret scanning and code scanning. CATES will
 > still score token efficiency, specificity, completeness, conflicts, and
 > harness quality, and any individual security rule you want to keep
 > (e.g. `MCP002`, `SEC005`) can be re-enabled with `rules.<ID>: on`.
@@ -425,13 +368,13 @@ cates-analyzer . --min-score 85 --fail-on critical,high
 ### 3. Adopt the configuration loop
 
 - Commit a `.cates.yml` so the policy is reviewed like code.
-- If a rule is genuinely not applicable (e.g. you use GHAS), **disable
+- If a rule is genuinely not applicable, **disable
   it** in `.cates.yml` rather than ignoring it everywhere.
 - If a finding is a known false positive, **suppress it** with a reason
   and (ideally) an `expires` date — the suppression report tells you
   when those expire.
-- Wire CATES into CI with `--format sarif` and upload to GitHub code
-  scanning, or `--format json` and feed it into your own dashboards.
+- Wire CATES into CI with `--format sarif` and upload to your code scanning
+  system, or `--format json` and feed it into your own dashboards.
 
 ### 4. Refactor toward the CATES recommendations
 
@@ -533,7 +476,7 @@ Common analyze options:
   --fail-on <list>            e.g. critical,high
   --max-always-loaded <n>     token budget gate
   --tokenizer <name>          openai-cl100k (default), openai-o200k, anthropic-claude, approx
-  --compare-tokenizers <list> side-by-side counts, e.g. openai-cl100k,anthropic-claude
+  --compare-tokenizers <list> side-by-side counts
   --files <list>              comma-separated relative files to analyze
   --individual                score each --files entry separately
   --fix / --fix-dry-run       safe mechanical fixes
@@ -541,7 +484,7 @@ Common analyze options:
 
 `review` accepts local folders and GitHub URLs. For private repositories, authenticate with `gh auth login` and use `review`; CATES uses local GitHub CLI credentials instead of asking for tokens.
 
-`demo` scans a built-in 100-repository manifest: 25 Microsoft, 25 GitHub, 25 Claude/Anthropic ecosystem, and 25 broader open-source repositories. Override it with `--repos-file repos.txt`, where each non-comment line is either a GitHub URL or `<category> <GitHub URL>`.
+`demo` scans repositories supplied with `--repos-file repos.txt`, where each non-comment line is either a repository URL or `<category> <repository URL>`.
 
 You can also run demo mode through the default command with `cates-analyzer --demo`.
 
@@ -725,29 +668,33 @@ all releases are recorded in [`CHANGELOG.md`](./CHANGELOG.md).
 
 ## License
 
-Copyright (c) Microsoft Corporation. All rights reserved.
+Copyright (c) Microsoft Corporation.
 
-Licensed under the [MIT License](LICENSE).
+Licensed under the [MIT License](LICENSE.TXT).
 
 ## Contributing
 
-This project welcomes contributions and suggestions. See [CONTRIBUTING.md](CONTRIBUTING.md) for
-details, including the [Microsoft CLA](https://cla.opensource.microsoft.com) requirement.
+This project welcomes contributions and suggestions. See [CONTRIBUTING.md](CONTRIBUTING.md) for details,
+including the Microsoft Contributor License Agreement requirement.
 
 ## Code of Conduct
 
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/)
-or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
 ## Security
 
 For information about reporting security vulnerabilities, please see [SECURITY.md](SECURITY.md).
-Do not report security issues through public GitHub issues — use [MSRC](https://msrc.microsoft.com/create-report) instead.
+Do not report security issues through public issue trackers; use the Microsoft Security Response
+Center reporting process described there.
 
 ## Support
 
 See [SUPPORT.md](SUPPORT.md) for how to file issues and get help.
+
+## Privacy and Telemetry
+
+CATES does not collect telemetry and does not send usage data or analyzed content to Microsoft.
+See [PRIVACY](PRIVACY) for details.
 
 ## Trademarks
 
@@ -755,5 +702,5 @@ This project may contain trademarks or logos for projects, products, or services
 Microsoft trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion
-or imply Microsoft sponsorship. Any use of third-party trademarks or logos are subject to those
-third-party's policies.
+or imply Microsoft sponsorship. Any use of third-party trademarks or logos is subject to those
+third-party policies.

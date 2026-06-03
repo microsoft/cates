@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { describe, it, expect } from 'vitest';
 import { evaluateConformance, evaluateGates } from '../src/conformance.js';
 import type { AnalysisResult, Finding, Severity, DiscoveryResult } from '../src/types.js';

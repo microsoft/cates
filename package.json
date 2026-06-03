@@ -19,6 +19,8 @@
     "!dist/**/*.map",
     "README.md",
     "LICENSE",
+    "LICENSE.TXT",
+    "PRIVACY",
     "CATES-v1.0.md"
   ],
   "scripts": {
@@ -49,16 +51,7 @@
     "token-efficiency",
     "security"
   ],
-  "author": "Microsoft Corporation",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/microsoft/cates.git"
-  },
-  "bugs": {
-    "url": "https://github.com/microsoft/cates/issues"
-  },
-  "homepage": "https://github.com/microsoft/cates#readme",
   "engines": {
     "node": ">=20.0.0"
   },

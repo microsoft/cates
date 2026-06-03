@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import type { Finding, AnalyzerOptions, AnalyzerFile } from '../types.js';
 
 /**
