@@ -15,7 +15,7 @@ Releases are automated via
 > from this analyzer package. Changes to the standard document do not
 > automatically produce a new analyzer release.
 
-## [1.1.0](https://github.com/microsoft/cates/compare/cates-analyzer-v1.0.0...cates-analyzer-v1.1.0) (2026-06-02)
+## [1.2.0](https://github.com/microsoft/cates/compare/cates-analyzer-v1.1.0...cates-analyzer-v1.2.0) (2026-06-02)
 
 
 ### Features
