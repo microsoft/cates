@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { parse as parseYaml } from 'yaml';
 import type { Finding, AnalyzerOptions, AnalyzerFile } from '../types.js';
 import { countTokens } from '../utils/tokenizer.js';

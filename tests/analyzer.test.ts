@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { describe, it, expect } from 'vitest';
 import { analyze } from '../src/analyzers/index.js';
 import { parseGitHubLink } from '../src/sources.js';
@@ -331,21 +333,18 @@ describe('CATES Analyzer', () => {
       expect(result.stderr).toContain('--format must be one of');
     });
 
-    it('ships a balanced 100-repository demo manifest', () => {
-      expect(DEFAULT_DEMO_REPOSITORIES).toHaveLength(100);
-      for (const category of ['microsoft', 'github', 'claude', 'open-source']) {
-        expect(DEFAULT_DEMO_REPOSITORIES.filter(repo => repo.category === category)).toHaveLength(25);
-      }
+    it('does not embed a default demo repository manifest', () => {
+      expect(DEFAULT_DEMO_REPOSITORIES).toEqual([]);
     });
 
-    it('fails clearly on invalid demo categories', () => {
+    it('accepts custom demo categories', () => {
       const result = spawnSync(process.execPath, [TSX_CLI, 'src/cli/index.ts', 'demo', '--category', 'bogus', '--limit', '1'], {
         cwd: REPO_ROOT,
         encoding: 'utf-8',
       });
 
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('--category contains invalid categories');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('CATES Demo Scan');
     });
   });
 

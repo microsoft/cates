@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import type { DiscoveryResult, Recommendation, SavingsEstimate, Score } from '../types.js';
 
 export function calculateSavings(

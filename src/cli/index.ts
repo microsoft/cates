@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 
 import { program } from 'commander';
 import { resolve } from 'node:path';
@@ -10,7 +12,7 @@ import { applySafeFixes } from '../autofix.js';
 import { getRule, RULE_CATALOG, rulesAsJson } from '../rules/catalog.js';
 import { scanPortfolio } from '../portfolio.js';
 import { resolveReviewSource } from '../sources.js';
-import { DEFAULT_DEMO_REPOSITORIES, type DemoCategory } from '../demo-repos.js';
+import type { DemoCategory } from '../demo-repos.js';
 import { scanDemo, type DemoScanResult } from '../demo.js';
 import { isTokenizerId, listTokenizers, type TokenizerId } from '../utils/tokenizer.js';
 import type { AnalysisResult, Severity } from '../types.js';
@@ -30,7 +32,7 @@ Examples:
   $ cates-analyzer ../my-repo --format json                 # JSON output
   $ cates-analyzer https://github.com/OWNER/REPO            # GitHub repo (auto-detected)
   $ cates-analyzer https://github.com/OWNER/REPO/pull/123   # pull request
-  $ cates-analyzer demo --category microsoft --limit 10     # built-in demo set
+  $ cates-analyzer demo --repos-file repos.txt --limit 10   # custom demo set
   $ cates-analyzer completion bash                          # shell completion
 `);
 
@@ -47,10 +49,10 @@ program.exitOverride((err) => {
 
 program
   .command('demo')
-  .description('Run a demo scan against the built-in 100-repository set or a custom repo file')
+  .description('Run a demo scan against repositories listed in a custom repo file')
   .option('-f, --format <format>', 'Output format: pretty or json', 'pretty')
-  .option('--repos-file <path>', 'Text file of repositories to scan; one GitHub URL per line, optionally prefixed by category')
-  .option('--category <list>', 'Comma-separated categories: microsoft,github,claude,open-source')
+  .option('--repos-file <path>', 'Text file of repositories to scan; one repository URL per line, optionally prefixed by category')
+  .option('--category <list>', 'Comma-separated custom categories from --repos-file')
   .option('--limit <n>', 'Scan only the first N repositories')
   .option('--concurrency <n>', 'Number of repositories to scan in parallel (1-8)', '4')
   .option('--max-files <n>', 'Maximum config files to analyze per repository', '50')
@@ -66,7 +68,7 @@ program
   .option('-q, --quiet', 'Suppress pretty-format headers; print only the data section')
   .option('--demo', 'Run demo scan instead of analyzing a path')
   .option('--repos-file <path>', 'Demo mode: text file of repositories to scan')
-  .option('--category <list>', 'Demo mode: comma-separated categories: microsoft,github,claude,open-source')
+  .option('--category <list>', 'Demo mode: comma-separated custom categories from --repos-file')
   .option('--limit <n>', 'Demo mode: scan only the first N repositories')
   .option('--concurrency <n>', 'Demo mode: number of repositories to scan in parallel (1-8)', '4')
   .option('--policy <path>', 'Path to .cates.yml/.json policy file')
@@ -395,7 +397,6 @@ function formatDemo(result: DemoScanResult): string {
   const lines = [
     'CATES Demo Scan',
     `Repositories: ${result.reposScanned}/${result.reposRequested} scanned (${result.reposFailed} failed)`,
-    `Default manifest size: ${DEFAULT_DEMO_REPOSITORIES.length} repositories`,
     `Average score: ${result.totals.averageScore}/100`,
     `Token reduction opportunity: ${result.totals.averageProjectedReductionPercentage.toFixed(1)}%`,
     `Finding density: ${result.totals.averageFindingsPerThousandTokens.toFixed(1)} findings per 1K analyzed tokens`,
@@ -486,16 +487,7 @@ function severityList(value: unknown): Severity[] | undefined {
 
 function categoryList(value: unknown): DemoCategory[] | undefined {
   if (typeof value !== 'string') return undefined;
-  const values = value.split(',').map(v => v.trim()).filter(v => v.length > 0);
-  const invalid = values.filter(value => !isDemoCategory(value));
-  if (invalid.length > 0) {
-    throw new Error(`--category contains invalid categories: ${invalid.join(', ')}. Allowed: microsoft, github, claude, open-source.`);
-  }
-  return values.filter(isDemoCategory);
-}
-
-function isDemoCategory(value: string): value is DemoCategory {
-  return value === 'microsoft' || value === 'github' || value === 'claude' || value === 'open-source';
+  return value.split(',').map(v => v.trim()).filter(v => v.length > 0);
 }
 
 function isSeverity(value: string): value is Severity {

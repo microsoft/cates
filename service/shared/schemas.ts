@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { z } from 'zod';
 
 // ─── Shared scalar schemas ───────────────────────────────────────────────────
@@ -35,7 +37,7 @@ export const PolicyInputSchema = z
     failOn: z.array(SeveritySchema).optional(),
     maxAlwaysLoadedTokens: z.number().int().nonnegative().optional(),
     rules: z.record(z.string().min(1), RuleOverrideSchema).optional(),
-    dimensions: z.record(DimensionSchema, RuleOverrideSchema).optional(),
+    dimensions: z.partialRecord(DimensionSchema, RuleOverrideSchema).optional(),
   })
   .strict();
 
@@ -43,8 +45,7 @@ export type PolicyInput = z.infer<typeof PolicyInputSchema>;
 
 // ─── Requests ────────────────────────────────────────────────────────────────
 
-// Hard limits keep the service stateless and DoS-resistant on shared hosts
-// like Azure Functions consumption plans.
+// Hard limits keep the service stateless and DoS-resistant on shared hosts.
 const MAX_FILES_PER_REQUEST = 50;
 const MAX_BYTES_PER_FILE = 100_000; // 100 KB
 const MAX_TOTAL_BYTES = 1_000_000; // 1 MB

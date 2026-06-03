@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { randomUUID } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import helmet from 'helmet';
@@ -12,7 +14,7 @@ import {
 
 /**
  * Express wrapper around the framework-agnostic handlers. Used by the
- * Docker / Azure Container Apps deployment target.
+ * Docker deployment target.
  *
  * Production hardening:
  * - helmet sets a strict CSP, HSTS, X-Frame-Options, no X-Powered-By, etc.
@@ -22,7 +24,7 @@ import {
  * - Concurrent /api/scan operations are bounded by a process-wide semaphore
  *   so a flood of slow clones cannot saturate the event loop.
  * - `trust proxy` is configurable via TRUST_PROXY (default: `loopback` for
- *   local dev; set to `1` or a CIDR in App Service / ACA so `req.ip` is the
+ *   local dev; set to `1` or a CIDR behind a trusted reverse proxy so `req.ip` is the
  *   real client IP and per-IP rate-limit buckets work correctly).
  * - Server NEVER logs request bodies or response bodies. Only method, path,
  *   status, duration, and request-id.
@@ -34,7 +36,7 @@ export function createServer(): express.Express {
   const app = express();
 
   app.disable('x-powered-by');
-  // When deployed behind ACA / App Service / a reverse proxy, set TRUST_PROXY
+  // When deployed behind a trusted reverse proxy, set TRUST_PROXY
   // to '1' (or a CIDR) so req.ip reflects the X-Forwarded-For client IP.
   // Default to 'loopback' which is safe for local dev.
   app.set('trust proxy', process.env.TRUST_PROXY ?? 'loopback');
@@ -207,9 +209,8 @@ if (isEntryPoint) {
   });
 
   // Graceful shutdown: stop accepting new connections, let in-flight work
-  // drain, then exit. ACA / App Service send SIGTERM and wait ~30s before
-  // SIGKILL during rolling deploys, so honoring this avoids cut-off scans
-  // and 502s during the deploy window.
+  // drain, then exit. Many orchestrators send SIGTERM before SIGKILL during
+  // rolling deploys, so honoring this avoids cut-off scans.
   const shutdown = (signal: NodeJS.Signals) => {
     // eslint-disable-next-line no-console
     console.log(JSON.stringify({ t: new Date().toISOString(), event: 'shutdown', signal }));

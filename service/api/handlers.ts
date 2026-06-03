@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { analyzeInMemory } from '../../src/analyze-in-memory.js';
 import { analyze } from '../../src/analyzers/index.js';
 import { RULE_CATALOG } from '../../src/rules/catalog.js';

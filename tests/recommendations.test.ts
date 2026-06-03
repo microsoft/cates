@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { describe, it, expect } from 'vitest';
 import { generateRecommendations } from '../src/scoring/recommendations.js';
 import type { DiscoveryResult, Finding } from '../src/types.js';

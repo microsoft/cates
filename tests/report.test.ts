@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { describe, it, expect } from 'vitest';
 import { createReport } from '../src/scoring/report.js';
 import type { AnalysisResult, Finding, Recommendation } from '../src/types.js';

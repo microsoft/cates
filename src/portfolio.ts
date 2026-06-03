@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { readdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { analyze } from './analyzers/index.js';

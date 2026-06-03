@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { z } from 'zod';
 
 // ─── Scoring Types ───────────────────────────────────────────────────────────
@@ -178,7 +180,7 @@ export const AnalyzerOptionsSchema = z.object({
     enabled: z.boolean().optional(),
     severity: z.enum(['critical', 'high', 'medium', 'low', 'info']).optional(),
   })).default({}),
-  dimensions: z.record(
+  dimensions: z.partialRecord(
     z.enum([
       'token-efficiency',
       'security',

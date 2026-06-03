@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { describe, expect, it } from 'vitest';
 import { applyRuleConfig } from '../src/rule-config.js';
 import type { Finding } from '../src/types.js';

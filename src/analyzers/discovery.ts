@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { resolve, relative, isAbsolute } from 'node:path';
 import { readdir, stat, realpath, open } from 'node:fs/promises';
 import type { DiscoveredFile, DiscoveryResult, ConfigType, ConfigScope, AnalyzerOptions } from '../types.js';

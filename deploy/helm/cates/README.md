@@ -1,6 +1,6 @@
 # Helm chart: cates
 
-Deploy the CATES analyzer to any Kubernetes cluster (AKS, EKS, GKE, k3s, kind)
+Deploy the CATES analyzer to any compatible cluster
 as a one-shot Job or a scheduled CronJob.
 
 ## Install
@@ -21,7 +21,7 @@ helm install cates ./deploy/helm/cates \
 helm install cates ./deploy/helm/cates \
   --set schedule="0 6 * * *" \
   --set githubToken.existingSecret=cates-gh \
-  --set-json 'args=["demo","--category","microsoft","--limit","25","--format","json"]'
+  --set-json 'args=["demo","--repos-file","/etc/cates/repos.txt","--limit","25","--format","json"]'
 ```
 
 ### One-shot review of a single repo
@@ -33,18 +33,18 @@ helm install cates-review ./deploy/helm/cates \
   --set-json 'args=["review","https://github.com/owner/repo","--format","sarif"]'
 ```
 
-### AKS Workload Identity
+### Workload identity
 
-Avoid storing a token in-cluster. Federate an Entra app to the chart's
-ServiceAccount, then have your init container (or a sidecar) exchange the
-federated token for a GitHub App installation token and write it to a
-shared volume / env var consumed by cates.
+Avoid storing a token in-cluster. Federate an identity to the chart's
+ServiceAccount, then have your init container or sidecar exchange the
+federated token for an installation token and write it to a shared volume
+or env var consumed by cates.
 
 ```bash
 helm install cates ./deploy/helm/cates \
   --set githubToken.workloadIdentity.enabled=true \
-  --set githubToken.workloadIdentity.clientId=$AZ_CLIENT_ID \
-  --set githubToken.workloadIdentity.tenantId=$AZ_TENANT_ID
+  --set githubToken.workloadIdentity.clientId=$IDENTITY_CLIENT_ID \
+  --set githubToken.workloadIdentity.tenantId=$IDENTITY_TENANT_ID
 ```
 
 ### Persistent reports

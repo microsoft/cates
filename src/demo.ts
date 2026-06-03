@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 import { readFile } from 'node:fs/promises';
 import { analyze } from './analyzers/index.js';
 import { evaluateConformance } from './conformance.js';
@@ -131,8 +133,8 @@ async function readRepositoriesFile(path: string): Promise<DemoRepository[]> {
     const line = rawLine.trim();
     if (!line || line.startsWith('#')) continue;
     const [categoryOrUrl = '', maybeUrl] = line.split(/\s+/);
-    const category = isDemoCategory(categoryOrUrl) && maybeUrl ? categoryOrUrl : 'custom';
-    const url = maybeUrl && category !== 'custom' ? maybeUrl : categoryOrUrl;
+    const category = maybeUrl ? categoryOrUrl : 'custom';
+    const url = maybeUrl ?? categoryOrUrl;
     const parsed = parseGitHubUrl(url);
     if (!parsed) {
       throw new Error(`Invalid repository URL on line ${index + 1}: ${rawLine}`);
@@ -254,10 +256,6 @@ function average(values: number[]): number {
 
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
-}
-
-function isDemoCategory(value: string | undefined): value is DemoCategory {
-  return value === 'microsoft' || value === 'github' || value === 'claude' || value === 'open-source';
 }
 
 function parseGitHubUrl(url: string | undefined): { owner: string; repo: string } | undefined {
