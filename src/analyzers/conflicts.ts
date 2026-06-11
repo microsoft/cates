@@ -121,6 +121,16 @@ function checkHarnessQuality(files: AnalyzerFile[]): Finding[] {
 
   const allContent = files.map(f => f.content).join('\n');
 
+  // Only evaluate harness quality when there is actual instruction prose to
+  // govern. A repo that only ships an MCP config or a settings file has no
+  // instruction layer, so reporting "missing scope limits / failure handling"
+  // there is noise, not signal. Require a minimum of instruction-style lines
+  // (headings or bullets) before judging guardrail coverage.
+  const instructionLines = allContent
+    .split('\n')
+    .filter(l => /^\s*(#{1,6}\s+\S|[-*•]\s+\S)/.test(l)).length;
+  if (instructionLines < 3) return findings;
+
   const missing = HARNESS_CHECKS.filter(check =>
     !check.patterns.some(p => p.test(allContent))
   );

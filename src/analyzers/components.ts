@@ -215,6 +215,41 @@ export async function analyzeMcp(
           });
         }
       }
+
+      // MCP006: unpinned package execution (supply-chain risk). An MCP server
+      // launched via `npx`/`uvx`/`dlx` without a version pin will silently pull
+      // whatever the registry serves at run time — a compromised or typosquatted
+      // release then runs locally with the agent's privileges.
+      if (servers && typeof servers === 'object') {
+        for (const [name, value] of Object.entries(servers as Record<string, unknown>)) {
+          if (!value || typeof value !== 'object') continue;
+          const entry = value as Record<string, unknown>;
+          const command = typeof entry['command'] === 'string' ? (entry['command'] as string) : '';
+          const args = Array.isArray(entry['args']) ? (entry['args'] as unknown[]).map(String) : [];
+          if (!/(^|\/)(npx|uvx|bunx|pnpm|yarn|npm)$/i.test(command)) continue;
+          if (command.toLowerCase() === 'pnpm' || command.toLowerCase() === 'yarn' || command.toLowerCase() === 'npm') {
+            if (!args.some(a => /^(dlx|exec)$/i.test(a))) continue;
+          }
+          // Identify a package-spec arg (skip flags, paths, and dlx/exec verbs).
+          const pkgArgs = args.filter(a =>
+            !a.startsWith('-') && !/^(dlx|exec)$/i.test(a) && !/^[./]/.test(a) && a !== '.'
+          );
+          if (pkgArgs.length === 0) continue;
+          const pinned = pkgArgs.some(a => /@\d+\.\d+|@[0-9a-f]{7,40}$|@\d+$/.test(a));
+          if (!pinned) {
+            findings.push({
+              ruleId: 'MCP006',
+              dimension: 'security',
+              severity: 'medium',
+              confidence: 'medium',
+              message: `MCP server "${name}" runs an unpinned package via ${command}. An unpinned release auto-updates and runs locally with the agent's privileges (supply-chain risk).`,
+              file: file.relativePath,
+              evidence: `${command} ${pkgArgs[0]}`.slice(0, 80),
+              suggestion: 'Pin the package to an exact version (e.g. @1.2.3) or a vetted commit, and review updates before bumping. Avoid @latest for code that runs on the developer machine.',
+            });
+          }
+        }
+      }
     }
   }
 
@@ -373,18 +408,20 @@ export async function analyzeHooks(
     // Check for outdated hook versions (pinning matters for security)
     const revMatches = content.match(/rev:\s*v?(\d+\.\d+\.\d+)/g);
     if (revMatches && revMatches.length > 0) {
-      // Just flag if any are 2+ years old as a maintenance concern
-      // (we can't actually check dates, but very low versions are suspicious)
-      const hasV1 = revMatches.some(r => /v?[01]\.\d+\.\d+/.test(r));
-      if (hasV1) {
+      // Flag only pre-1.0 (v0.x) pins. A 0.x release signals an unstable,
+      // pre-release tool surface; 1.x+ is intentionally excluded because many
+      // mature, actively-maintained hooks legitimately sit at 1.x and flagging
+      // them produced pure noise.
+      const hasV0 = revMatches.some(r => /v?0\.\d+\.\d+/.test(r));
+      if (hasV0) {
         findings.push({
           ruleId: 'HK003',
           dimension: 'security',
           severity: 'low',
           confidence: 'low',
-          message: 'Some hook repos are pinned to v0.x/v1.x versions. These may have known vulnerabilities.',
+          message: 'Some hook repos are pinned to a pre-1.0 (v0.x) release. Pre-release tooling changes quickly and may carry unpatched issues.',
           file: file.relativePath,
-          suggestion: 'Update hook versions to latest stable releases for security fixes.',
+          suggestion: 'Prefer a 1.0+ stable release where available, and review the changelog before bumping pinned hook versions.',
         });
       }
     }
@@ -411,8 +448,11 @@ export async function analyzeEditorConfig(
   for (const file of editorFiles) {
     const content = file.content;
 
-    // Only analyze if it has AI-assistant-related settings
-    if (!/copilot|github\.copilot/i.test(content)) continue;
+    // Analyze when the file carries AI-assistant settings OR a tool-permission
+    // allowlist (Claude `settings.json`). Other editor settings are ignored.
+    const hasCopilot = /copilot|github\.copilot/i.test(content);
+    const hasPermissions = /"permissions"/.test(content);
+    if (!hasCopilot && !hasPermissions) continue;
 
     let settings: Record<string, unknown>;
     try {
@@ -425,12 +465,36 @@ export async function analyzeEditorConfig(
         dimension: 'completeness',
         severity: 'low',
         confidence: 'medium',
-        message: 'VS Code settings.json has syntax errors (possibly trailing commas or comments).',
+        message: 'Editor/agent settings file has syntax errors (possibly trailing commas or comments).',
         file: file.relativePath,
-        suggestion: 'Ensure settings.json is valid JSONC. VS Code tolerates it but other tools may not.',
+        suggestion: 'Ensure the settings file is valid JSONC. VS Code tolerates it but other tools may not.',
       });
       continue;
     }
+
+    // EDC003 — overly permissive tool allowlist. An `allow` entry that grants
+    // unconstrained shell, write, or all-tools access turns a per-action
+    // approval model into standing permission. Constrained entries such as
+    // `Bash(npm test)` or read-only `Read(*)` are intentionally NOT flagged.
+    const permissions = settings['permissions'] as Record<string, unknown> | undefined;
+    const allow = permissions && Array.isArray(permissions['allow'])
+      ? (permissions['allow'] as unknown[]).map(String)
+      : [];
+    const dangerous = allow.filter(entry => isDangerousAllow(entry));
+    if (dangerous.length > 0) {
+      findings.push({
+        ruleId: 'EDC003',
+        dimension: 'security',
+        severity: 'high',
+        confidence: 'high',
+        message: `Tool allowlist grants unconstrained access: ${dangerous.slice(0, 3).join(', ')}. The agent can run shell, write files, or use any tool with no per-action approval.`,
+        file: file.relativePath,
+        evidence: dangerous.slice(0, 3).join(', ').slice(0, 80),
+        suggestion: 'Constrain each allowed tool to specific, safe invocations (e.g. `Bash(npm test)` instead of `Bash`/`Bash(*)`), and never allow a bare `*`. Keep destructive tools behind the approval prompt.',
+      });
+    }
+
+    if (!hasCopilot) continue;
 
     // Check for assistant disabled for specific languages (might be intentional, flag as info)
     const copilotEnable = settings['github.copilot.enable'] as Record<string, boolean> | undefined;
@@ -451,4 +515,24 @@ export async function analyzeEditorConfig(
   }
 
   return findings;
+}
+
+/**
+ * True when a permission-allowlist entry grants unconstrained shell, write, or
+ * all-tools access. Constrained calls (`Bash(npm test)`) and read-only wildcards
+ * (`Read(*)`) are safe and return false.
+ */
+function isDangerousAllow(entry: string): boolean {
+  const e = entry.trim();
+  if (e === '*' || e === '"*"') return true;
+  // Tool with no argument constraint, e.g. `Bash`, or wildcard arg `Bash(*)`.
+  const m = e.match(/^([A-Za-z]+)(?:\(\s*(.*?)\s*\))?$/);
+  if (!m) return false;
+  const tool = m[1]!;
+  const arg = m[2];
+  const dangerousTools = /^(Bash|Shell|Exec|Execute|Run|Write|Edit|MultiEdit|Update|NotebookEdit)$/i;
+  if (!dangerousTools.test(tool)) return false;
+  // No parens at all => unconstrained. `(*)`/`(:*)`/empty => unconstrained.
+  if (arg === undefined) return true;
+  return arg === '' || arg === '*' || arg === ':*' || arg === '**';
 }

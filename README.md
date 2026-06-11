@@ -242,7 +242,7 @@ score updates immediately and the result includes `disabledRuleIds` /
 | Capability | What you get |
 |---|---|
 | **Zero-LLM static analysis** | Deterministic, fast, no API keys, no data exfiltration |
-| **42 rules** across 6 dimensions | Token efficiency, security, specificity, completeness, conflict/reachability, harness quality |
+| **49 rules** across 6 dimensions | Token efficiency, security, specificity, completeness, conflict/reachability, harness quality |
 | **Per-family tokenizers** | Model-family tokenizers or an offline approximation — pick one or compare side-by-side |
 | **Multi-surface discovery** | Instructions, prompt libraries, MCP configs, hooks, setup steps, editor settings |
 | **Configurable** | Toggle any rule or whole dimension on/off, override severities, suppress with reasons + expirations |
@@ -547,7 +547,7 @@ improve coverage, never silently lower it.
 
 ## 📋 Complete Rule Reference
 
-All **42 rules** in the analyzer's catalog, grouped by dimension and sorted
+All **49 rules** in the analyzer's catalog, grouped by dimension and sorted
 by severity. The same data is available programmatically:
 
 ```bash
@@ -562,12 +562,16 @@ turn any rule on/off or override its severity in `.cates.yml`.
 > `cates-analyzer . --fix` can apply a safe, mechanical change for this
 > rule; `—` means the fix is manual.
 
-### 🔐 Security (12 rules)
+### 🔐 Security (17 rules)
 
 | Rule | Title | Severity | CATES § | Autofix |
 |---|---|---|---|---|
 | MCP002 | Secrets in MCP Configuration | Critical | Annex C | — |
 | SEC001 | Hardcoded Secrets | Critical | 9.3 | — |
+| SEC007 | Autonomy / Approval Bypass | Critical | 9.3 | — |
+| AGT001 | Subagent Missing Tool Restriction | High | 9.8 | — |
+| CMD001 | Command Auto-Executes Shell | High | 9.8 | — |
+| EDC003 | Overly Permissive Tool Allowlist | High | Annex F | — |
 | MCP003 | Insecure MCP Endpoint | High | Annex C | — |
 | MCP005 | Shell Operators in MCP Command | High | Annex C | — |
 | SEC002 | Injection Vectors | High | 9.3 | — |
@@ -575,11 +579,12 @@ turn any rule on/off or override its severity in `.cates.yml`.
 | SEC005 | System Prompt Leakage Risk | High | 9.3 | — |
 | SEC006 | Unsafe Execution Patterns | High | 9.3 | — |
 | STP001 | Pipe-to-Shell Setup Pattern | High | Annex D | — |
+| MCP006 | Unpinned MCP Server Package | Medium | Annex C | — |
 | SEC004 | Missing Prompt Protection | Medium | 9.3 | ✅ |
 | STP003 | Broad Setup Permissions | Medium | Annex D | — |
 | HK003 | Outdated Hook Version | Low | Annex E | — |
 
-### ⚡ Token Efficiency (10 rules)
+### ⚡ Token Efficiency (11 rules)
 
 | Rule | Title | Severity | CATES § | Autofix |
 |---|---|---|---|---|
@@ -590,16 +595,18 @@ turn any rule on/off or override its severity in `.cates.yml`.
 | TE002 | Excessive Inline Code Examples | Medium | 9.2 | — |
 | TE005 | Negative Constraint Spam | Medium | 9.2 | — |
 | TE007 | Within-File Duplicate Instructions | Medium | 9.2 | ✅ |
+| TE008 | Unbounded Context Includes | Medium | 9.2 | — |
 | HK002 | Heavy Hook Operation | Low | Annex E | — |
 | STP002 | Missing Dependency Caching | Low | Annex D | — |
 | TE003 | Generic Filler Instructions | Low | 9.2 | — |
 
-### 🎯 Specificity (7 rules)
+### 🎯 Specificity (8 rules)
 
 | Rule | Title | Severity | CATES § | Autofix |
 |---|---|---|---|---|
 | SPC001 | Vague Language | Medium | 9.4 | — |
 | SPC002 | Missing Project Context | Medium | 9.4 | — |
+| AGT002 | Subagent Missing Description | Low | 9.8 | — |
 | MCP004 | Missing MCP Server Descriptions | Low | Annex C | — |
 | PRM001 | Missing Prompt Purpose Header | Low | Annex B | ✅ |
 | PRM003 | Excessive Hardcoded File Paths | Low | Annex B | — |
@@ -648,6 +655,8 @@ turn any rule on/off or override its severity in `.cates.yml`.
 | `STP` | Setup-step checks (CATES Annex D) |
 | `HK`  | Hook checks (CATES Annex E) |
 | `EDC` | Editor configuration checks (CATES Annex F) |
+| `AGT` | Subagent-definition checks (CATES §9.8) |
+| `CMD` | Slash-command checks (CATES §9.8) |
 
 
 

@@ -30,6 +30,7 @@ export async function analyzeSecurity(
     findings.push(...checkOverlyPermissive(lines, file.relativePath));
     findings.push(...checkSystemPromptLeakage(lines, file.relativePath));
     findings.push(...checkUnsafePatterns(lines, file.relativePath));
+    findings.push(...checkAutonomyBypass(lines, file.relativePath));
   }
 
   return findings;
@@ -87,32 +88,65 @@ function redactSecret(line: string, pattern: RegExp): string {
 
 // ─── Prompt Injection Vectors ────────────────────────────────────────────────
 
+// SEC002 targets genuine injection risk: untrusted/dynamic values templated
+// directly into instruction text, and prompt-injection payloads checked into
+// config. It deliberately does NOT flag ordinary template interpolation such as
+// `${id}` in a code example or environment references like `${env:VAR}` /
+// `${SECRET_NAME}` — those are normal (and, per MCP002, the recommended way to
+// avoid hardcoded secrets). Flagging them produced noise and contradicted other
+// rules, so the patterns below require an untrusted-source token to match.
+const INJECTION_PATTERNS: Array<{
+  pattern: RegExp;
+  label: string;
+  severity: Finding['severity'];
+  confidence: Finding['confidence'];
+}> = [
+  {
+    pattern: /\{\{\s*(user|input|args?|arguments?|param|query|request|message|stdin|clipboard|selection)[\w.\s]*\}\}/i,
+    label: 'Untrusted value templated directly into instructions ({{...}})',
+    severity: 'high',
+    confidence: 'medium',
+  },
+  {
+    pattern: /\$\{\s*(user|input|args?|arguments?|param|query|request|message|stdin|clipboard|selection)[\w.]*\s*\}/i,
+    label: 'Untrusted value interpolated into instructions (${...})',
+    severity: 'high',
+    confidence: 'medium',
+  },
+  {
+    pattern: /\$(ARGUMENTS|USER_INPUT|INPUT|QUERY|PROMPT|STDIN|SELECTION)\b/,
+    label: 'Raw argument/input variable injected into instructions',
+    severity: 'high',
+    confidence: 'medium',
+  },
+  {
+    pattern: /(ignore|disregard|forget) (all |any )?(the )?(previous|prior|above|earlier) (instructions?|context|rules?|prompts?)/i,
+    label: 'Prompt-injection payload present in config',
+    severity: 'high',
+    confidence: 'medium',
+  },
+];
+
 function checkPromptInjectionVectors(lines: string[], file: string): Finding[] {
   const findings: Finding[] = [];
-
-  const injectionPatterns = [
-    { pattern: /\{\{.*user.*input.*\}\}/i, label: 'User input template interpolation in instructions' },
-    { pattern: /\$\{.*\}/i, label: 'Variable interpolation (could be user-controlled)' },
-    { pattern: /ignore (all )?previous instructions/i, label: 'Prompt injection payload in config (possibly testing)' },
-    { pattern: /reveal (your|the) (system|original) (prompt|instructions)/i, label: 'System prompt extraction attempt' },
-  ];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     if (!isScannableLine(line)) continue;
-    for (const { pattern, label } of injectionPatterns) {
+    for (const { pattern, label, severity, confidence } of INJECTION_PATTERNS) {
       if (pattern.test(line)) {
         findings.push({
           ruleId: 'SEC002',
           dimension: 'security',
-          severity: 'high',
-          confidence: 'medium',
-          message: `Potential injection vector: ${label}`,
+          severity,
+          confidence,
+          message: `Potential injection vector: ${label}. Untrusted text reaching the instruction layer can override agent guardrails.`,
           file,
           line: i + 1,
           evidence: line.trim().slice(0, 80),
-          suggestion: 'Never interpolate untrusted/user-controlled values into agent instructions. Use structured tool inputs instead.',
+          suggestion: 'Pass dynamic values through structured, validated tool inputs instead of interpolating them into instruction prose. Treat any user/argument-derived text as data, not instructions.',
         });
+        break; // one finding per line is enough; avoids double-counting overlaps
       }
     }
   }
@@ -241,6 +275,97 @@ function checkUnsafePatterns(lines: string[], file: string): Finding[] {
           evidence: line.trim().slice(0, 80),
           suggestion: 'Remove unsafe patterns. If this is an example, wrap it clearly as a "DO NOT DO" with safe alternative.',
         });
+      }
+    }
+  }
+
+  return findings;
+}
+
+// ─── Autonomy / Approval Bypass ──────────────────────────────────────────────
+
+// SEC007 flags configuration that removes the human-in-the-loop or tool-approval
+// guardrails a coding agent relies on. These settings let an agent run shell
+// commands, edit files, or merge code with no confirmation — turning an ordinary
+// prompt-injection or hallucinated command into an immediate, unattended action.
+// Patterns are intentionally specific to approval/permission bypass so benign
+// phrasing like "auto-run the test suite" does not match.
+const AUTONOMY_PATTERNS: Array<{
+  pattern: RegExp;
+  label: string;
+  severity: Finding['severity'];
+  confidence: Finding['confidence'];
+}> = [
+  {
+    pattern: /--dangerously-skip-permissions/i,
+    label: 'Permission-prompt bypass flag (--dangerously-skip-permissions)',
+    severity: 'critical',
+    confidence: 'high',
+  },
+  {
+    pattern: /(^|[^\w-])--yolo\b|\byolo[\s_-]?mode\b/i,
+    label: 'YOLO / no-confirmation execution mode',
+    severity: 'critical',
+    confidence: 'high',
+  },
+  {
+    pattern: /["']?(default|permission)[_-]?mode["']?\s*[:=]\s*["']?bypass[_-]?permissions["']?/i,
+    label: 'Permission prompts globally bypassed (bypassPermissions mode)',
+    severity: 'critical',
+    confidence: 'high',
+  },
+  {
+    pattern: /\bauto[\s_-]?approve(\s+all)?\b/i,
+    label: 'Auto-approve of tool/command actions',
+    severity: 'critical',
+    confidence: 'high',
+  },
+  {
+    pattern: /"?auto[_-]?approve(all)?"?\s*[:=]\s*true/i,
+    label: 'Auto-approve enabled in config',
+    severity: 'critical',
+    confidence: 'high',
+  },
+  {
+    pattern: /\b(allow|enable)[\s_-]?all[\s_-]?tools?\b|--allow-all-tools?\b/i,
+    label: 'All tools auto-allowed without scoping',
+    severity: 'critical',
+    confidence: 'high',
+  },
+  {
+    pattern: /\b(skip|disable|bypass|turn off)\s+(all\s+)?(the\s+)?(permission|confirmation|approval|guardrail|safety)s?\b/i,
+    label: 'Approval/permission guardrails disabled',
+    severity: 'critical',
+    confidence: 'medium',
+  },
+  {
+    pattern: /\bwithout\s+(human\s+|user\s+|any\s+)?(approval|confirmation|review|asking|prompting|oversight)\b/i,
+    label: 'Acts without human approval/confirmation',
+    severity: 'high',
+    confidence: 'medium',
+  },
+];
+
+function checkAutonomyBypass(lines: string[], file: string): Finding[] {
+  const findings: Finding[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (!isScannableLine(line)) continue;
+    for (const { pattern, label, severity, confidence } of AUTONOMY_PATTERNS) {
+      if (pattern.test(line)) {
+        findings.push({
+          ruleId: 'SEC007',
+          dimension: 'security',
+          severity,
+          confidence,
+          message: `Autonomy/approval bypass: ${label}. The agent can take irreversible actions (run commands, edit files, merge) with no human checkpoint.`,
+          file,
+          line: i + 1,
+          evidence: line.trim().slice(0, 80),
+          suggestion: 'Keep tool approval / permission prompts enabled. Scope auto-approval to a small, explicitly-listed set of safe, read-only or non-destructive tools rather than bypassing the gate entirely.',
+        });
+        break;
       }
     }
   }
