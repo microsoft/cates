@@ -5,8 +5,8 @@ import { RULE_CATALOG, getRule, rulesAsJson } from '../src/rules/catalog.js';
 import * as lib from '../src/index.js';
 
 describe('rules/catalog', () => {
-  it('has 42 rules (the documented count)', () => {
-    expect(RULE_CATALOG).toHaveLength(42);
+  it('has 49 rules (the documented count)', () => {
+    expect(RULE_CATALOG).toHaveLength(49);
   });
 
   it('getRule returns metadata for known ids and undefined for unknown', () => {

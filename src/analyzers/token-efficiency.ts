@@ -40,10 +40,86 @@ export async function analyzeTokenEfficiency(
     findings.push(...checkGenericFiller(fc));
     findings.push(...checkForcedVerbosity(fc));
     findings.push(...checkNegativeConstraintSpam(fc));
+    findings.push(...checkUnboundedIncludes(fc));
   }
 
   // Cross-file: check for duplicate content across files
   findings.push(...checkCrossFileDuplication(fileContents));
+
+  return findings;
+}
+
+// TE008: instruction files that pull in context via unbounded include
+// directives (recursive globs, whole-directory references, or a large number of
+// @file includes) silently expand the loaded context every time the file is
+// active. A single `@src/**` can inject thousands of tokens that grow with the
+// repo, defeating the point of a tight instruction file.
+function checkUnboundedIncludes(fc: FileContent): Finding[] {
+  const findings: Finding[] = [];
+
+  // Only instruction-bearing text files use @-style includes. Skip JSON/code.
+  if (!/\.(md|mdc|markdown|txt)$/i.test(fc.relativePath) &&
+      !/(^|\/)(\.cursorrules|\.windsurfrules|\.clinerules)$/i.test(fc.relativePath)) {
+    return findings;
+  }
+
+  const lines = fc.content.split('\n');
+  let inFence = false;
+  // Path-like @include: an @ followed by something containing a slash, a glob
+  // star, or a known file extension. Excludes emails/decorators/handles.
+  const includeRe = /(^|[\s(])@(?:import\s+|include\s+)?((?:\.{0,2}\/)?[\w.@/-]*(?:\/|\*|\.(?:md|mdc|markdown|txt|ts|tsx|js|jsx|py|go|rs|java|rb|json|ya?ml))[\w./*-]*)/i;
+
+  let includeCount = 0;
+  let firstIncludeLine = 0;
+  const unboundedHits: Array<{ line: number; evidence: string }> = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (!isScannableLine(line)) continue;
+    const fence = line.trim().match(/^(```|~~~)/);
+    if (fence) { inFence = !inFence; continue; }
+    if (inFence) continue;
+
+    const m = includeRe.exec(line);
+    if (!m) continue;
+    const target = m[2]!;
+    includeCount++;
+    if (includeCount === 1) firstIncludeLine = i + 1;
+
+    // Unbounded if recursive glob, directory reference (trailing slash), or
+    // single-level wildcard over a directory.
+    if (/\*\*/.test(target) || /\/\s*$/.test(target) || /\/\*/.test(target) || /^@?\*/.test(target)) {
+      unboundedHits.push({ line: i + 1, evidence: line.trim().slice(0, 80) });
+    }
+  }
+
+  if (unboundedHits.length > 0) {
+    const first = unboundedHits[0]!;
+    findings.push({
+      ruleId: 'TE008',
+      dimension: 'token-efficiency',
+      severity: 'medium',
+      confidence: 'high',
+      message: `Unbounded context include: a recursive glob or whole-directory reference injects an unpredictable, repo-sized amount of content into context whenever this file is active (${unboundedHits.length} such include${unboundedHits.length > 1 ? 's' : ''}).`,
+      file: fc.relativePath,
+      line: first.line,
+      evidence: first.evidence,
+      suggestion: 'Replace directory/recursive includes with references to the few specific files the agent actually needs, or summarize the directory inline. Pull large content on-demand from prompt files instead of always-loaded instructions.',
+      tokenImpact: 1500 * unboundedHits.length,
+    });
+  } else if (includeCount > 10) {
+    findings.push({
+      ruleId: 'TE008',
+      dimension: 'token-efficiency',
+      severity: 'low',
+      confidence: 'medium',
+      message: `High include fan-out: ${includeCount} @file includes are pulled into context from one instruction file. Each adds tokens on every activation.`,
+      file: fc.relativePath,
+      line: firstIncludeLine,
+      suggestion: 'Consolidate to the handful of references the agent needs most often, and move the rest to on-demand prompt files.',
+      tokenImpact: (includeCount - 5) * 150,
+    });
+  }
 
   return findings;
 }

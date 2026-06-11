@@ -10,6 +10,8 @@ import { analyzeSpecificity } from './specificity.js';
 import { analyzeCompleteness } from './completeness.js';
 import { analyzeConflicts } from './conflicts.js';
 import { analyzePrompts, analyzeMcp, analyzeSetupSteps, analyzeHooks, analyzeEditorConfig } from './components.js';
+import { analyzeAgents } from './agents.js';
+import { analyzeCommands } from './commands.js';
 import { calculateScore } from '../scoring/calculator.js';
 import { generateRecommendations } from '../scoring/recommendations.js';
 import { calculateSavings } from '../scoring/savings.js';
@@ -53,6 +55,8 @@ async function analyzeWithContext(options: AnalyzerOptions): Promise<AnalysisRes
     setupFindings,
     hookFindings,
     editorFindings,
+    agentFindings,
+    commandFindings,
   ] = await Promise.all([
     analyzeTokenEfficiency(activeFiles, options),
     analyzeSecurity(activeFiles, options),
@@ -64,6 +68,8 @@ async function analyzeWithContext(options: AnalyzerOptions): Promise<AnalysisRes
     analyzeSetupSteps(activeFiles, options),
     analyzeHooks(activeFiles, options),
     analyzeEditorConfig(activeFiles, options),
+    analyzeAgents(activeFiles, options),
+    analyzeCommands(activeFiles, options),
   ]);
 
   const budgetFindings: Finding[] = [];
@@ -92,6 +98,8 @@ async function analyzeWithContext(options: AnalyzerOptions): Promise<AnalysisRes
     ...setupFindings,
     ...hookFindings,
     ...editorFindings,
+    ...agentFindings,
+    ...commandFindings,
   ];
   // Apply rule/dimension toggles BEFORE suppressions so disabled rules never
   // contribute to scoring, gating, or counts.

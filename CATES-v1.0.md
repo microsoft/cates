@@ -196,6 +196,8 @@ Rules are identified by a prefix indicating their domain and a numeric sequence:
 | STP | Setup Steps |
 | HK | Hooks |
 | EDC | Editor Configuration |
+| AGT | Subagent Definitions |
+| CMD | Slash Commands |
 
 ### 4.3 Severity Levels
 
@@ -663,6 +665,27 @@ Each rule is defined with the following attributes:
 
 ---
 
+#### TE008 — Unbounded Context Includes
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | token-efficiency |
+| Severity | Medium |
+| Applicability | Instruction-bearing text files (`*.md`, `*.mdc`, rules files) |
+
+**Detection:** An instruction file pulls content into context through unbounded include directives:
+- A recursive glob include (`@src/**`, `@**/*.ts`)
+- A whole-directory reference (`@docs/`) or single-level wildcard over a directory (`@src/*`)
+- High include fan-out (more than 10 `@file` includes in a single file) — reported at Low severity
+
+Two specific file references (`@src/auth/login.ts`, `@README.md`) are not flagged.
+
+**Rationale:** A single `@src/**` can inject thousands of tokens that grow as the repository grows, silently expanding loaded context on every activation and defeating the purpose of a tight instruction file. The cost is paid on every invocation and is invisible at authoring time.
+
+**Remediation:** Reference only the specific files the agent actually needs, summarize a directory inline, or move bulk content to on-demand prompt files that are loaded only when relevant.
+
+---
+
 ### 9.3 Security Rules
 
 #### SEC001 — Hardcoded Secrets
@@ -692,14 +715,15 @@ Each rule is defined with the following attributes:
 | Severity | High |
 | Applicability | All configuration types |
 
-**Detection:** Content contains unvalidated variable interpolation patterns that could be user-controlled:
-- `{env:...}` in positions that become instructions
-- `{{user_input}}` without sanitization context
-- Dynamic template markers in security-sensitive positions
+**Detection:** Untrusted or dynamic values are templated directly into instruction text, or a prompt-injection payload is checked into configuration:
+- Interpolation whose source is an untrusted token, e.g. `{{user_input}}`, `${query}`, `$ARGUMENTS`
+- Injection payload phrasing such as "ignore all previous instructions" or "disregard the above"
+
+Ordinary code-example interpolation (`${id}`) and environment references (`${env:DATABASE_URL}`, `${SECRET_NAME}`) are explicitly **not** flagged — they are normal and, for secrets, the recommended alternative to hardcoding (see MCP002). Flagging them produced noise and contradicted other rules.
 
 **Rationale:** If user-controlled content is interpolated into system instructions, an attacker can modify the AI assistant's behavior (prompt injection).
 
-**Remediation:** Never interpolate untrusted values into instructions. Use structured tool inputs, validated schemas, or sandboxed template evaluation.
+**Remediation:** Treat any user/argument-derived text as data, not instructions. Pass dynamic values through structured, validated tool inputs rather than interpolating them into instruction prose.
 
 ---
 
@@ -778,6 +802,28 @@ Each rule is defined with the following attributes:
 **Rationale:** AI agents may execute or reproduce these patterns. Unsafe examples in configuration files can become executable guidance during autonomous work.
 
 **Remediation:** Remove unsafe commands. If a dangerous command must appear as documentation, clearly label it as prohibited and provide the safe alternative.
+
+---
+
+#### SEC007 — Autonomy / Approval Bypass
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | security |
+| Severity | Critical (High for "without approval" prose) |
+| Applicability | All configuration types |
+
+**Detection:** Configuration removes the human-approval or tool-permission checkpoint a coding agent relies on:
+- Permission-bypass flags such as `--dangerously-skip-permissions` or `--yolo`
+- A global bypass mode (`defaultMode: "bypassPermissions"`)
+- Auto-approval of actions (`auto-approve`, `autoApprove: true`) or `allow-all-tools`
+- Phrasing that disables guardrails ("skip all confirmations") or acts "without human approval"
+
+Benign phrasing such as "auto-run the test suite" is intentionally not matched.
+
+**Rationale:** These settings turn an ordinary prompt-injection or hallucinated command into an immediate, unattended action — the agent can run shell, edit files, or merge code with no human checkpoint. This is the autonomy analogue of an overly permissive scope (SEC003) and is the single highest-leverage way to lose control of a coding agent.
+
+**Remediation:** Keep tool approval / permission prompts enabled. Scope auto-approval to a small, explicitly-listed set of safe, read-only or non-destructive tools rather than bypassing the gate entirely.
 
 ---
 
@@ -929,7 +975,83 @@ Severity is **medium** when one to four topics are missing and **high** when mor
 
 ### 9.7 Component Rules
 
-*Detailed component rules are specified in Annexes A-F.*
+*Detailed component rules are specified in Annexes A-F.* Two component rules added after the initial release:
+
+#### MCP006 — Unpinned MCP Server Package
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | security |
+| Severity | Medium |
+| Applicability | MCP configuration (Annex C) |
+
+**Detection:** A stdio MCP server is launched via `npx`/`uvx`/`bunx` (or `npm`/`pnpm`/`yarn` `dlx`/`exec`) with no version pin — no `@x.y.z`, no exact tag, and no commit SHA.
+
+**Rationale:** An unpinned package auto-updates and runs locally with the agent's privileges. A compromised or typosquatted release then executes on the developer machine (supply-chain risk).
+
+**Remediation:** Pin the package to an exact version (`@1.2.3`) or a vetted commit, and review updates before bumping. Avoid `@latest` for code that runs on the developer machine.
+
+#### EDC003 — Overly Permissive Tool Allowlist
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | security |
+| Severity | High |
+| Applicability | Editor/agent settings with a `permissions.allow` list (Annex F) |
+
+**Detection:** A `permissions.allow` entry grants unconstrained access: a bare or wildcard execution/write tool (`Bash`, `Bash(*)`, `Write(*)`, `Edit(*)`) or a global `*`. Constrained calls (`Bash(npm test)`) and read-only wildcards (`Read(*)`) are not flagged.
+
+**Rationale:** An unconstrained allowlist entry converts a per-action approval model into standing permission, so the agent can run shell, write files, or use any tool without a checkpoint. This is the settings-file form of SEC007.
+
+**Remediation:** Constrain each allowed tool to specific, safe invocations, and never allow a bare `*`. Keep destructive tools behind the approval prompt.
+
+---
+
+### 9.8 Subagent and Command Rules
+
+Custom subagents and slash commands are distinct configuration surfaces: a subagent runs with its own context window and tool access, and a command can execute work as a side effect of being invoked.
+
+#### AGT001 — Subagent Missing Tool Restriction
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | security |
+| Severity | High |
+| Applicability | Agent-definition files (`agents/`, `.github/agents/`, `.claude/agents/`, etc.) |
+
+**Detection:** An agent-definition file's frontmatter declares no `tools`/`allowed-tools` (or `permissions`) key.
+
+**Rationale:** A subagent with no declared tool scope inherits the orchestrator's full toolset, violating least privilege. A narrowly-scoped reviewer or doc subagent should not be able to run shell, write files, or push code.
+
+**Remediation:** Declare an explicit `tools:` list granting only what the subagent needs.
+
+#### AGT002 — Subagent Missing Description
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | specificity |
+| Severity | Low |
+| Applicability | Agent-definition files |
+
+**Detection:** An agent-definition file has no `description`/`name`/`purpose` metadata and no heading.
+
+**Rationale:** Without a description/trigger, the orchestrator must guess when to delegate, causing mis-routing and wasted token round-trips.
+
+**Remediation:** Add a `description:` (and `name:`) stating exactly when the subagent should be invoked.
+
+#### CMD001 — Command Auto-Executes Shell
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | security |
+| Severity | High |
+| Applicability | Command files (`.claude/commands/`, `.gemini/commands/`, `commands/`) |
+
+**Detection:** A command file contains a `!`-prefixed bang directive that runs shell before the prompt is sent, or its `allowed-tools` frontmatter grants `Bash`.
+
+**Rationale:** `/command`-triggered shell execution is a low-friction path to running attacker-influenced commands (e.g. via a poisoned argument or pasted text), and its output is injected into context with no approval step.
+
+**Remediation:** Avoid running shell as a side effect of invoking a command. If output is needed, run the command through the normal approvable tool path, or pin it to a fixed, non-parameterized command.
 
 ---
 
@@ -1759,12 +1881,14 @@ Tools claiming CATES conformance SHOULD produce scores within ±5 points of the 
 | TE005 | Medium | token-efficiency | >60% negative bullet instructions |
 | TE006 | High | token-efficiency | Cross-file duplication >50 tokens |
 | TE007 | Medium | token-efficiency | Within-file duplicate instructions |
+| TE008 | Medium | token-efficiency | Unbounded context includes (recursive globs / whole-dir) |
 | SEC001 | Critical | security | Hardcoded secrets in config |
-| SEC002 | High | security | Injection vector (unvalidated interpolation) |
+| SEC002 | High | security | Injection vector (untrusted templating / payload) |
 | SEC003 | High | security | Overly permissive scope ("any file") |
 | SEC004 | Medium | security | Missing prompt protection |
 | SEC005 | High | security | System prompt leakage risk |
 | SEC006 | High | security | Unsafe execution patterns |
+| SEC007 | Critical | security | Autonomy / approval bypass |
 | SPC001 | Medium | specificity | Vague language ("appropriate", "as needed") |
 | SPC002 | Medium | specificity | Missing technology version/specifics |
 | SPC003 | Low | specificity | Missing architecture/module structure |
@@ -1784,6 +1908,7 @@ Tools claiming CATES conformance SHOULD produce scores within ±5 points of the 
 | MCP003 | High | security | Non-localhost HTTP in MCP config |
 | MCP004 | Low | specificity | MCP servers missing descriptions |
 | MCP005 | High | security | Shell operators in MCP command |
+| MCP006 | Medium | security | Unpinned MCP server package (npx/uvx) |
 | STP001 | High | security | Pipe-to-shell in setup steps |
 | STP002 | Low | token-efficiency | Missing dependency caching |
 | STP003 | Medium | security | Overly broad permissions |
@@ -1794,6 +1919,10 @@ Tools claiming CATES conformance SHOULD produce scores within ±5 points of the 
 | HK003 | Low | security | Outdated hook versions |
 | EDC001 | Low | completeness | Invalid settings file syntax |
 | EDC002 | Low | completeness | AI assistance disabled for many languages |
+| EDC003 | High | security | Overly permissive tool allowlist |
+| AGT001 | High | security | Subagent missing tool restriction |
+| AGT002 | Low | specificity | Subagent missing description/trigger |
+| CMD001 | High | security | Command auto-executes shell on invocation |
 
 ---
 
@@ -1814,7 +1943,7 @@ See Section 3 for formal definitions. This glossary provides informal explanatio
 ### v1.0.0-draft (2026-05-05)
 
 - Initial working draft
-- 42 rules across 10 domains
+- 49 rules across 12 domains
 - 3 conformance levels
 - 6 scoring dimensions
 - Annexes A-F (normative component standards)
