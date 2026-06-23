@@ -71,11 +71,13 @@ CATES is vendor-agnostic. Any AI coding assistant that consumes repository-level
 | Surface | Examples |
 |---------|----------|
 | Repository instructions | Instruction markdown files (e.g., `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `QWEN.md`, `.ai/instructions.md`, `.github/copilot-instructions.md`) |
+| Path-specific instructions | Glob-scoped instruction files with an `applyTo` header (e.g., `.github/instructions/*.instructions.md`) |
 | Prompt libraries | Reusable prompt and command files (e.g., `.ai/prompts/*.md`, `.claude/commands/*.md`, `.github/prompts/*.md`) |
+| Chat modes | Custom chat-mode definitions (e.g., `.github/chatmodes/*.chatmode.md`) |
 | Agent definitions | Agent configuration files (e.g., `.ai/agents/*.yml`, `.claude/agents/*.md`, `.github/agents/*.yml`) |
 | Rules and memories | Assistant rule files (e.g., `.cursorrules`, `.cursor/rules/*.mdc`, `.windsurfrules`, `.windsurf/rules/*.md`, `.cline/rules/*.md`, `.roo/rules/*.md`) |
 | Tool configurations | MCP configs, tool manifests (`mcp.json`, `.mcp.json`, `.claude/mcp.json`, `.vscode/mcp.json`) |
-| Environment setup | Agent environment setup (e.g., `agent-setup.yml`, `.ai/agent-setup.yml`, `copilot-setup-steps.yml`) |
+| Environment setup | Agent environment setup (e.g., `agent-setup.yml`, `.ai/agent-setup.yml`, `.github/workflows/copilot-setup-steps.yml`) |
 | Editor settings | IDE/editor config files with AI assistant settings (e.g., `.claude/settings.json`, `.cursor/settings.json`, `.aider.conf.yml`) |
 | Pre-commit hooks | Hook configurations that affect AI agent workflows |
 | Vision/guardrail files | Policy and guardrail definitions |
@@ -391,12 +393,14 @@ CATES-conformant tools SHOULD recognize both vendor-specific and vendor-neutral 
 
 - Root instruction files: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `QWEN.md`, `.ai/instructions.md`, `.github/copilot-instructions.md`
 - Directory-scoped instruction files: nested `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and `QWEN.md`
+- Path-specific instruction files: `.github/instructions/*.instructions.md`, `.ai/instructions/*.instructions.md`
 - Prompt and command libraries: `.github/prompts/*.md`, `.ai/prompts/*.md`, `.claude/commands/*.md`, `.gemini/commands/*.md`
+- Chat modes: `.github/chatmodes/*.chatmode.md`, `.ai/chatmodes/*.chatmode.md`
 - Agent definitions: `.github/agents/*`, `.ai/agents/*`, `.claude/agents/*`, `.gemini/agents/*`
 - Rule files: `.cursorrules`, `.cursor/rules/*.mdc`, `.windsurfrules`, `.windsurf/rules/*`, `.clinerules`, `.cline/rules/*`, `.roo/rules/*`, `.ai/rules/*`
 - MCP configurations: `mcp.json`, `.mcp.json`, `.vscode/mcp.json`, `.claude/mcp.json`, `.gemini/mcp.json`, `.ai/mcp.json`
 - Settings and extension configs: `.vscode/settings.json`, `.cursor/settings.json`, `.claude/settings.json`, `.claude/settings.local.json`, `.gemini/settings.json`, `.aider.conf.yml`, `.aiderignore`
-- Setup and hooks: `.github/copilot-setup-steps.yml`, `.ai/agent-setup.yml`, `.pre-commit-config.yaml`, `.claude/hooks/*`, `.ai/hooks/*`
+- Setup and hooks: `.github/workflows/copilot-setup-steps.yml`, `.ai/agent-setup.yml`, `.pre-commit-config.yaml`, `.claude/hooks/*`, `.ai/hooks/*`
 
 This list is intentionally extensible. New coding-agent ecosystems SHOULD be mapped into the normative CATES type taxonomy rather than creating vendor-specific scoring dimensions.
 

@@ -74,8 +74,10 @@ export interface SavingsEstimate {
 export type ConfigScope = 'always-loaded' | 'conditional' | 'on-demand' | 'unknown';
 export type ConfigType =
   | 'root-instructions'
+  | 'path-instructions'
   | 'agents-md'
   | 'chat-config'
+  | 'chat-mode'
   | 'agent-definition'
   | 'skill-definition'
   | 'prompt-file'

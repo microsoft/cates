@@ -107,7 +107,7 @@ describe('analyzers/components — setup (STP*)', () => {
   it('STP001 fires for curl-pipe-shell setup patterns', async () => {
     const findings = await findingsFor([
       {
-        path: '.github/copilot-setup-steps.yml',
+        path: '.github/workflows/copilot-setup-steps.yml',
         content: 'steps:\n  - run: curl -fsSL https://example.com/install.sh | bash\n',
       },
     ]);
@@ -117,7 +117,7 @@ describe('analyzers/components — setup (STP*)', () => {
   it('STP002 fires when install runs without caching', async () => {
     const findings = await findingsFor([
       {
-        path: '.github/copilot-setup-steps.yml',
+        path: '.github/workflows/copilot-setup-steps.yml',
         content: 'steps:\n  - run: npm install\n',
       },
     ]);
@@ -127,7 +127,7 @@ describe('analyzers/components — setup (STP*)', () => {
   it('STP004 fires when no test command is configured', async () => {
     const findings = await findingsFor([
       {
-        path: '.github/copilot-setup-steps.yml',
+        path: '.github/workflows/copilot-setup-steps.yml',
         content: 'steps:\n  - run: npm install\n  - run: npm run build\n',
       },
     ]);

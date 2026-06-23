@@ -2,7 +2,7 @@
 
 > Score coding-agent configurations for **token efficiency**, **security**, and **CATES conformance** — zero LLM calls required.
 
-This is the reference implementation for the **Coding Agent Token Economics Standard (CATES)**. It is vendor-neutral and analyzes common coding-agent configuration surfaces, including instructions, prompt libraries, MCP configs, setup steps, hooks, and editor settings.
+This is the reference implementation for the **Coding Agent Token Economics Standard (CATES)**. It is vendor-neutral and analyzes common coding-agent configuration surfaces, including repository and path-specific instructions, prompt libraries, chat modes, MCP configs, setup steps, hooks, and editor settings.
 
 ---
 
@@ -244,7 +244,7 @@ score updates immediately and the result includes `disabledRuleIds` /
 | **Zero-LLM static analysis** | Deterministic, fast, no API keys, no data exfiltration |
 | **49 rules** across 6 dimensions | Token efficiency, security, specificity, completeness, conflict/reachability, harness quality |
 | **Per-family tokenizers** | Model-family tokenizers or an offline approximation — pick one or compare side-by-side |
-| **Multi-surface discovery** | Instructions, prompt libraries, MCP configs, hooks, setup steps, editor settings |
+| **Multi-surface discovery** | Repository + path-specific instructions, prompt libraries, chat modes, MCP configs, hooks, setup steps, editor settings |
 | **Configurable** | Toggle any rule or whole dimension on/off, override severities, suppress with reasons + expirations |
 | **Multiple output formats** | Human-readable text, JSON, **SARIF** for code scanning systems |
 | **CI-ready gates** | `--min-score`, `--require-level`, `--fail-on`, `--max-always-loaded` |
@@ -448,12 +448,14 @@ The default tokenizer can also be set via `CATES_TOKENIZER=anthropic-claude`.
 |-------------|------|---------------|
 | `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `QWEN.md`, `.ai/instructions.md`, `.github/copilot-instructions.md` | Root instructions | Always-loaded |
 | Nested `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `QWEN.md` | Scoped instructions | Conditional |
+| `.github/instructions/*.instructions.md`, `.ai/instructions/*.instructions.md` | Path-specific instructions (`applyTo`) | Conditional (always-loaded when `applyTo` targets every file) |
 | `.github/prompts/*.md`, `.ai/prompts/*.md`, `.claude/commands/*.md`, `.gemini/commands/*.md` | Prompt/command files | On-demand |
+| `.github/chatmodes/*.chatmode.md`, `.ai/chatmodes/*.chatmode.md` | Custom chat modes | On-demand |
 | `agents/*`, `.github/agents/*`, `.ai/agents/*`, `.claude/agents/*`, `.gemini/agents/*` | Agent definitions | Conditional |
 | `.cursorrules`, `.cursor/rules/*.mdc`, `.windsurfrules`, `.windsurf/rules/*`, `.clinerules`, `.cline/rules/*`, `.roo/rules/*`, `.ai/rules/*` | Rule files | Always/conditional |
 | MCP configs (`mcp.json`, `.mcp.json`, `.vscode/mcp.json`, `.claude/mcp.json`, `.gemini/mcp.json`, `.ai/mcp.json`) | Tool/server configs | Conditional |
 | `.vscode/settings.json`, `.cursor/settings.json`, `.claude/settings*.json`, `.gemini/settings.json`, `.aider.conf.yml`, `.aiderignore` | Editor/CLI settings | Conditional |
-| Setup and hook configs (`.ai/agent-setup.yml`, `.github/copilot-setup-steps.yml`, `.pre-commit-config.yaml`, `.claude/hooks/*`, `.ai/hooks/*`) | Agent environment/harness | Environmental |
+| Setup and hook configs (`.ai/agent-setup.yml`, `.github/workflows/copilot-setup-steps.yml`, `.pre-commit-config.yaml`, `.claude/hooks/*`, `.ai/hooks/*`) | Agent environment/harness | Environmental |
 
 ## 🛠 CLI Options
 

@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 import { describe, it, expect } from 'vitest';
 import { analyze } from '../src/analyzers/index.js';
+import { analyzeInMemory } from '../src/analyze-in-memory.js';
 import { parseGitHubLink } from '../src/sources.js';
 import { getRule, RULE_CATALOG } from '../src/rules/catalog.js';
 import { DEFAULT_DEMO_REPOSITORIES } from '../src/demo-repos.js';
@@ -201,6 +202,64 @@ describe('CATES Analyzer', () => {
       expect(types).toContain('rules-config');
       expect(types).toContain('mcp-config');
       expect(types).toContain('setup-steps');
+    });
+  });
+
+  describe('Copilot primitives fixture', () => {
+    it('discovers path-specific instructions, chat modes, prompts, and setup steps', async () => {
+      const result = await analyze({ repoPath: resolve(FIXTURES, 'copilot') });
+      const paths = result.discovery.files.map(f => f.relativePath);
+      const types = result.discovery.files.map(f => f.type);
+
+      expect(paths).toContain('.github/instructions/api.instructions.md');
+      expect(paths).toContain('.github/instructions/global.instructions.md');
+      expect(paths).toContain('.github/chatmodes/refactor.chatmode.md');
+      expect(paths).toContain('.github/prompts/commit.prompt.md');
+      // Canonical coding-agent setup-steps location is a workflow file.
+      expect(paths).toContain('.github/workflows/copilot-setup-steps.yml');
+
+      expect(types).toContain('path-instructions');
+      expect(types).toContain('chat-mode');
+      expect(types).toContain('prompt-file');
+      expect(types).toContain('setup-steps');
+    });
+
+    it('classifies chat modes as on-demand', async () => {
+      const result = await analyze({ repoPath: resolve(FIXTURES, 'copilot') });
+      const chatMode = result.discovery.files.find(f => f.type === 'chat-mode');
+      expect(chatMode?.scope).toBe('on-demand');
+    });
+
+    it('treats `applyTo: "**"` instructions as always-loaded but scoped globs as conditional', async () => {
+      const result = await analyze({ repoPath: resolve(FIXTURES, 'copilot') });
+      const global = result.discovery.files.find(f => f.relativePath.endsWith('global.instructions.md'));
+      const api = result.discovery.files.find(f => f.relativePath.endsWith('api.instructions.md'));
+
+      expect(global?.scope).toBe('always-loaded');
+      expect(api?.scope).toBe('conditional');
+      // The always-loaded instructions file must count against the budget.
+      expect(result.discovery.alwaysLoadedTokens).toBeGreaterThan(global?.tokenCount ?? 0);
+    });
+
+    it('does not detect a setup-steps file placed outside .github/workflows', async () => {
+      const result = await analyzeInMemory({
+        files: [
+          { path: '.github/copilot-setup-steps.yml', content: 'jobs:\n  copilot-setup-steps:\n    runs-on: ubuntu-latest\n' },
+        ],
+      });
+      const setup = result.discovery.files.filter(f => f.type === 'setup-steps');
+      expect(setup).toHaveLength(0);
+    });
+
+    it('detects a setup-steps file at the canonical .github/workflows path', async () => {
+      const result = await analyzeInMemory({
+        files: [
+          { path: '.github/workflows/copilot-setup-steps.yml', content: 'jobs:\n  copilot-setup-steps:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm ci\n' },
+        ],
+      });
+      const setup = result.discovery.files.filter(f => f.type === 'setup-steps');
+      expect(setup).toHaveLength(1);
+      expect(setup[0]!.relativePath).toBe('.github/workflows/copilot-setup-steps.yml');
     });
   });
 
