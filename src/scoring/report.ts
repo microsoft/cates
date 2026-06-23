@@ -261,7 +261,7 @@ function coverageRows(result: AnalysisResult): Array<{ label: string; present: b
   const hasPath = (pattern: RegExp) => files.some(file => pattern.test(file.relativePath));
   const countType = (type: string) => files.filter(file => file.type === type).length;
   return [
-    { label: 'Copilot', present: hasPath(/^\.github\/copilot|^\.github\/prompts|^\.github\/copilot-instructions\.md$/), detail: `${files.filter(file => file.relativePath.startsWith('.github/')).length} GitHub config file(s)` },
+    { label: 'Copilot', present: hasPath(/^\.github\/copilot|^\.github\/prompts|^\.github\/instructions\/|^\.github\/chatmodes\/|^\.github\/copilot-instructions\.md$/), detail: `${files.filter(file => file.relativePath.startsWith('.github/')).length} GitHub config file(s)` },
     { label: 'Claude', present: hasPath(/(?:^|\/)\.claude\/|(?:^|\/)CLAUDE\.md$/i), detail: `${files.filter(file => /\.claude\//i.test(file.relativePath) || /CLAUDE\.md$/i.test(file.relativePath)).length} Claude file(s)` },
     { label: 'Cursor', present: hasPath(/(?:^|\/)\.cursor\/|(?:^|\/)\.cursorrules$/i), detail: `${files.filter(file => /\.cursor\//i.test(file.relativePath) || /\.cursorrules$/i.test(file.relativePath)).length} Cursor file(s)` },
     { label: 'Gemini', present: hasPath(/(?:^|\/)\.gemini\/|(?:^|\/)GEMINI\.md$/i), detail: `${files.filter(file => /\.gemini\//i.test(file.relativePath) || /GEMINI\.md$/i.test(file.relativePath)).length} Gemini file(s)` },
@@ -269,6 +269,8 @@ function coverageRows(result: AnalysisResult): Array<{ label: string; present: b
     { label: 'Hooks', present: countType('hooks-config') > 0, detail: `${countType('hooks-config')} hook config(s)` },
     { label: 'Setup', present: countType('setup-steps') > 0, detail: `${countType('setup-steps')} setup config(s)` },
     { label: 'Prompts', present: countType('prompt-file') > 0, detail: `${countType('prompt-file')} prompt file(s)` },
+    { label: 'Instructions', present: countType('path-instructions') > 0, detail: `${countType('path-instructions')} path-scoped instruction file(s)` },
+    { label: 'Chat modes', present: countType('chat-mode') > 0, detail: `${countType('chat-mode')} chat mode(s)` },
   ];
 }
 

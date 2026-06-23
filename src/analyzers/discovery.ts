@@ -21,7 +21,7 @@ export interface DiscoveryOutput {
  * - No execution of discovered content
  */
 
-const CONFIG_PATTERNS: Array<{ pattern: RegExp; type: ConfigType; scope: ConfigScope }> = [
+const CONFIG_PATTERNS: Array<{ pattern: RegExp; type: ConfigType; scope: ConfigScope; refineScope?: (content: string) => ConfigScope }> = [
   // Always-loaded: global custom instructions
   { pattern: /^\.github\/copilot-instructions\.md$/i, type: 'root-instructions', scope: 'always-loaded' },
   { pattern: /^\.ai\/instructions\.md$/i, type: 'root-instructions', scope: 'always-loaded' },
@@ -35,11 +35,18 @@ const CONFIG_PATTERNS: Array<{ pattern: RegExp; type: ConfigType; scope: ConfigS
   { pattern: /^.+\/CLAUDE\.md$/i, type: 'root-instructions', scope: 'conditional' },
   { pattern: /^.+\/GEMINI\.md$/i, type: 'root-instructions', scope: 'conditional' },
   { pattern: /^.+\/QWEN\.md$/i, type: 'root-instructions', scope: 'conditional' },
+  // Path-specific instructions (`applyTo` glob). Conditional by default; promoted
+  // to always-loaded when the glob applies to every file (e.g. `applyTo: "**"`).
+  { pattern: /^\.github\/instructions\/.+\.instructions\.md$/i, type: 'path-instructions', scope: 'conditional', refineScope: instructionsScope },
+  { pattern: /^\.ai\/instructions\/.+\.instructions\.md$/i, type: 'path-instructions', scope: 'conditional', refineScope: instructionsScope },
   // On-demand: Prompt files
   { pattern: /^\.github\/prompts\/.*\.md$/i, type: 'prompt-file', scope: 'on-demand' },
   { pattern: /^\.ai\/prompts\/.*\.md$/i, type: 'prompt-file', scope: 'on-demand' },
   { pattern: /^\.claude\/commands\/.*\.md$/i, type: 'prompt-file', scope: 'on-demand' },
   { pattern: /^\.gemini\/commands\/.*\.md$/i, type: 'prompt-file', scope: 'on-demand' },
+  // On-demand: custom chat modes (user selects the mode before it loads)
+  { pattern: /^\.github\/chatmodes\/.+\.chatmode\.md$/i, type: 'chat-mode', scope: 'on-demand' },
+  { pattern: /^\.ai\/chatmodes\/.+\.chatmode\.md$/i, type: 'chat-mode', scope: 'on-demand' },
   // Conditional: chat config
   { pattern: /^\.github\/copilot-chat\.ya?ml$/i, type: 'chat-config', scope: 'conditional' },
   { pattern: /^\.ai\/chat\.ya?ml$/i, type: 'chat-config', scope: 'conditional' },
@@ -61,8 +68,9 @@ const CONFIG_PATTERNS: Array<{ pattern: RegExp; type: ConfigType; scope: ConfigS
   { pattern: /^\.cline\/rules\/.*\.md$/i, type: 'rules-config', scope: 'conditional' },
   { pattern: /^\.roo\/rules\/.*\.md$/i, type: 'rules-config', scope: 'conditional' },
   { pattern: /^\.ai\/rules\/.*\.(md|mdc|ya?ml|json)$/i, type: 'rules-config', scope: 'conditional' },
-  // Coding agent: setup steps (environment prep for coding agents)
-  { pattern: /^\.github\/copilot-setup-steps\.ya?ml$/i, type: 'setup-steps', scope: 'conditional' },
+  // Coding agent: setup steps (environment prep for coding agents). Canonical
+  // location is a GitHub Actions workflow with a `copilot-setup-steps` job.
+  { pattern: /^\.github\/workflows\/copilot-setup-steps\.ya?ml$/i, type: 'setup-steps', scope: 'conditional' },
   { pattern: /^\.ai\/agent-setup\.ya?ml$/i, type: 'setup-steps', scope: 'conditional' },
   // Hooks: pre-commit config that can affect agent workflows
   { pattern: /^\.pre-commit-config\.ya?ml$/i, type: 'hooks-config', scope: 'on-demand' },
@@ -94,7 +102,7 @@ const CONFIG_PATTERNS: Array<{ pattern: RegExp; type: ConfigType; scope: ConfigS
   { pattern: /^\.aider\..*$/i, type: 'extension-config', scope: 'conditional' },
 ];
 
-type FileClassification = { type: ConfigType; scope: ConfigScope };
+type FileClassification = { type: ConfigType; scope: ConfigScope; refineScope?: (content: string) => ConfigScope };
 
 export async function discoverFiles(options: AnalyzerOptions): Promise<DiscoveryOutput> {
   const repoRoot = await realpath(resolve(options.repoPath));
@@ -143,11 +151,16 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
 
       const tokenCount = countTokens(content, tokenizer);
 
+      // Some file types determine their loading scope from their contents
+      // (e.g. `.instructions.md` files whose `applyTo` glob targets every file
+      // are effectively always-loaded).
+      const scope = match.refineScope ? match.refineScope(content) : match.scope;
+
       files.push({
         path: realFullPath,
         relativePath,
         type: match.type,
-        scope: match.scope,
+        scope,
         sizeBytes: fileStat.size,
         tokenCount,
         isActive: true,
@@ -288,4 +301,24 @@ function isBinary(buffer: Buffer): boolean {
 function isInside(root: string, candidate: string): boolean {
   const rel = relative(root, candidate);
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+}
+
+/**
+ * Determines the loading scope of a `.instructions.md` file from its `applyTo`
+ * frontmatter. VS Code / Copilot apply these conditionally based on the glob (or
+ * a semantic match when `applyTo` is absent), so they default to `conditional`.
+ * A glob that targets every file makes the file effectively always-loaded, which
+ * counts against the always-loaded token budget.
+ */
+function instructionsScope(content: string): ConfigScope {
+  const frontmatter = content.match(/^\s*---\r?\n([\s\S]*?)\r?\n---/);
+  if (!frontmatter) return 'conditional';
+  const applyTo = frontmatter[1]!.match(/^\s*applyTo\s*:\s*(.+?)\s*$/m);
+  if (!applyTo) return 'conditional';
+  const globs = applyTo[1]!
+    .replace(/^\[|\]$/g, '')
+    .split(',')
+    .map(g => g.trim().replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean);
+  return globs.some(g => g === '**' || g === '**/*') ? 'always-loaded' : 'conditional';
 }
