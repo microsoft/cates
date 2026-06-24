@@ -103,3 +103,15 @@ will now fail unless `.cates.yml` lowers the severity.
 are released as document revisions, not as npm releases. When the standard
 graduates from `-draft` or moves to `1.1.0` / `2.0.0`, update the document
 header and reference the new version explicitly in analyzer release notes.
+
+## Experimental rules and dimensions
+
+Experimental rules and dimensions (currently cache-shaping `CS0xx` and
+output-shaping `OS0xx`, marked 🧪 in the catalog) are **exempt from SemVer**.
+They MAY change behavior, change severity, be renumbered, or be removed in any
+**minor** release without a breaking-change bump, because they are off by
+default, carry zero scoring weight, and never affect `score.overall`,
+conformance, or CI gates. Automation MUST NOT depend on experimental rule IDs or
+the `result.experimental` channel for gating. An experimental rule graduates to
+stable only by being assigned a non-zero weight and admitted to conformance —
+which changes default scores and therefore requires a **major** release.

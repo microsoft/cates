@@ -22,3 +22,11 @@ export { createReport } from './scoring/report.js';
 export { evaluateConformance, evaluateGates } from './conformance.js';
 export { RULE_CATALOG, getRule } from './rules/catalog.js';
 export type { AnalysisResult, Finding, Score, AnalyzerOptions } from './types.js';
+
+// Optimizer: a separate, deliberately-invoked tool that rewrites primitives for
+// token efficiency with a guaranteed no-loss-of-function property.
+export { optimize } from './optimizer/index.js';
+export { OPTIMIZERS, selectOptimizers, meaningfulSignature } from './optimizer/optimizers.js';
+export { renderOptimizationReport } from './optimizer/report.js';
+export type { OptimizationReportFormat } from './optimizer/report.js';
+export type { OptimizationResult, OptimizeOptions } from './optimizer/types.js';

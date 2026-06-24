@@ -1,17 +1,19 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-import type { Dimension, Severity } from '../types.js';
+import type { Dimension, ExperimentalDimension, Severity, Stability } from '../types.js';
 
 export interface RuleMetadata {
   id: string;
   title: string;
-  dimension: Dimension;
+  dimension: Dimension | ExperimentalDimension;
   severity: Severity;
   summary: string;
   detection: string;
   remediation: string;
   catesSection: string;
   autofix?: boolean;
+  /** Defaults to 'stable'. Experimental rules are non-normative and SemVer-exempt. */
+  stability?: Stability;
 }
 
 export const RULE_CATALOG: RuleMetadata[] = [
@@ -74,10 +76,35 @@ export const RULE_CATALOG: RuleMetadata[] = [
   { id: 'AGT002', title: 'Subagent Missing Description', dimension: 'specificity', severity: 'low', summary: 'Subagent lacks a description/trigger for routing.', detection: 'Flag agent-definition files with no description/name/purpose metadata or heading.', remediation: 'Add a description (and name) stating when the subagent should be invoked.', catesSection: '9.8', autofix: false },
 
   { id: 'CMD001', title: 'Command Auto-Executes Shell', dimension: 'security', severity: 'high', summary: 'Slash command runs shell on invocation via bang-syntax or a Bash tool grant.', detection: 'Flag command files with !-prefixed execution directives or allowed-tools granting Bash.', remediation: 'Remove side-effect shell execution or constrain it to a fixed, non-parameterized command.', catesSection: '9.8', autofix: false },
+
+  // ─── Experimental (non-normative) cache/output-shaping rules ─────────────────
+  // These carry ZERO scoring weight, are excluded from conformance + CI gates,
+  // and are SemVer-exempt. See docs/EXPERIMENTAL-CACHE-OUTPUT-DIMENSIONS.md.
+  { id: 'CS001', title: 'Volatile Tokens in Always-Loaded Config', dimension: 'cache-shaping', severity: 'high', summary: 'Always-loaded config embeds volatile values (dates, UUIDs, build numbers, git SHAs) that bust the cacheable prefix every call.', detection: 'Scan always-loaded files for timestamp/date/UUID/build/SHA patterns or "current date/time" directives.', remediation: 'Move volatile values out of the always-loaded prefix; inject them via tool inputs at the end of context instead.', catesSection: '9.9', autofix: false, stability: 'experimental' },
+  { id: 'CS002', title: 'Dynamic-Before-Static Ordering', dimension: 'cache-shaping', severity: 'medium', summary: 'Variable placeholders or includes appear ahead of a large static block, shrinking the cacheable prefix.', detection: 'Detect ${…}/{{…}}/@include placeholders positioned before the bulk of static content.', remediation: 'Put stable, static content first; place variable/dynamic content at the end.', catesSection: '9.9', autofix: false, stability: 'experimental' },
+  { id: 'CS003', title: 'Non-Deterministic Context Directive', dimension: 'cache-shaping', severity: 'medium', summary: 'Instructions inject live/volatile state at the top (current git status, latest logs, today\'s date).', detection: 'Match directives that pull live/volatile state into the preamble.', remediation: 'Fetch volatile state on-demand via tools rather than embedding it in always-loaded instructions.', catesSection: '9.9', autofix: false, stability: 'experimental' },
+  { id: 'CS004', title: 'Unstable Tool/Context Ordering', dimension: 'cache-shaping', severity: 'low', summary: 'Directives randomize or re-sort tool lists / retrieved context per call.', detection: 'Match shuffle/randomize/re-sort directives over tools or context.', remediation: 'Keep tool and context ordering stable and deterministic across calls.', catesSection: '9.9', autofix: false, stability: 'experimental' },
+  { id: 'CS005', title: 'Fragmented Preamble (No Shared Prelude)', dimension: 'cache-shaping', severity: 'info', summary: 'High cross-file near-duplication of preamble that could be one shared cacheable prelude.', detection: 'Correlate with TE006 cross-file duplication of leading preamble blocks.', remediation: 'Hoist the shared preamble into a single, stable, precedence-appropriate prelude.', catesSection: '9.9', autofix: false, stability: 'experimental' },
+
+  { id: 'OS001', title: 'Missing Output Contract', dimension: 'output-shaping', severity: 'medium', summary: 'Config never bounds output (no length cap, no code-only/no-preamble, no format spec).', detection: 'Flag instruction-bearing configs that set no output bound or format contract.', remediation: 'Add a concise output contract (length cap, "code only, no preamble", or required format).', catesSection: '9.10', autofix: false, stability: 'experimental' },
+  { id: 'OS002', title: 'Full-File Rewrite Mandate', dimension: 'output-shaping', severity: 'high', summary: 'Instructions require emitting entire files instead of diffs/patches — large, avoidable output.', detection: 'Match "return/output the complete/entire file" style mandates.', remediation: 'Prefer diffs/patches or targeted edits; reserve full-file output for new files.', catesSection: '9.10', autofix: false, stability: 'experimental' },
+  { id: 'OS003', title: 'Unconditional Verbose Reasoning', dimension: 'output-shaping', severity: 'medium', summary: 'Forces detailed chain-of-thought/explanation on every response regardless of task.', detection: 'Match unconditional "explain your reasoning / think step by step on every response" directives.', remediation: 'Make reasoning depth conditional on task complexity rather than global.', catesSection: '9.10', autofix: false, stability: 'experimental' },
+  { id: 'OS004', title: 'Output Echo / Restatement', dimension: 'output-shaping', severity: 'low', summary: 'Instructs the agent to restate the prompt, echo inputs, or repeat context back.', detection: 'Match restate/echo/repeat-back directives.', remediation: 'Remove echo/restatement requirements; have the agent act directly.', catesSection: '9.10', autofix: false, stability: 'experimental' },
+  { id: 'OS005', title: 'Verbose Format Mandate', dimension: 'output-shaping', severity: 'info', summary: 'Requires heavyweight formatting (decorative sections, full tables) where compact output suffices.', detection: 'Match mandates for heavyweight/decorative formatting on every response.', remediation: 'Default to compact output; reserve rich formatting for when it is requested.', catesSection: '9.10', autofix: false, stability: 'experimental' },
 ];
 
 export function getRule(id: string): RuleMetadata | undefined {
   return RULE_CATALOG.find(rule => rule.id === id);
+}
+
+/** Stable rules only — the normative catalog used for scoring/conformance. */
+export function stableRules(): RuleMetadata[] {
+  return RULE_CATALOG.filter(rule => rule.stability !== 'experimental');
+}
+
+/** Experimental, non-normative rules (cache/output shaping). */
+export function experimentalRules(): RuleMetadata[] {
+  return RULE_CATALOG.filter(rule => rule.stability === 'experimental');
 }
 
 export function rulesAsJson(): string {

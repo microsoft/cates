@@ -4,7 +4,8 @@
   "description": "Analyze coding agent configurations for token efficiency, security, and CATES conformance",
   "type": "module",
   "bin": {
-    "cates-analyzer": "./dist/cli/index.js"
+    "cates-analyzer": "./dist/cli/index.js",
+    "cates-optimize": "./dist/optimizer/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,7 +25,7 @@
     "CATES-v1.0.md"
   ],
   "scripts": {
-    "build": "tsc && chmod +x dist/cli/index.js",
+    "build": "tsc && chmod +x dist/cli/index.js dist/optimizer/cli.js",
     "build:service": "tsc -p tsconfig.service.json && node -e \"require('fs').cpSync('service/web','dist-service/service/web',{recursive:true})\"",
     "dev": "tsx watch src/cli/index.ts",
     "start": "node dist/cli/index.js",

@@ -15,6 +15,7 @@ import { resolveReviewSource } from '../sources.js';
 import type { DemoCategory } from '../demo-repos.js';
 import { scanDemo, type DemoScanResult } from '../demo.js';
 import { isTokenizerId, listTokenizers, type TokenizerId } from '../utils/tokenizer.js';
+import { formatExperimental } from '../scoring/report.js';
 import type { AnalysisResult, Severity } from '../types.js';
 
 program
@@ -85,6 +86,8 @@ program
   .option('--compare-tokenizers <list>', 'Comma-separated tokenizers to report side-by-side (e.g. openai-cl100k,anthropic-claude)')
   .option('--fix', 'Apply safe automatic fixes')
   .option('--fix-dry-run', 'Show safe automatic fixes without writing files')
+  .option('--experimental', 'Include experimental (non-normative) cache/output-shaping findings — not scored')
+  .option('--experimental-only', 'Show only the experimental cache/output-shaping section')
   .action(async (path: string, opts) => runAnalyze(path, opts));
 
 program
@@ -106,6 +109,8 @@ program
   .option('--compare-tokenizers <list>', 'Comma-separated tokenizers to report side-by-side')
   .option('--keep-worktree', 'Keep temporary clone after reviewing GitHub sources')
   .option('--no-gh', 'Use git directly instead of gh for GitHub sources')
+  .option('--experimental', 'Include experimental (non-normative) cache/output-shaping findings — not scored')
+  .option('--experimental-only', 'Show only the experimental cache/output-shaping section')
   .action(async (source: string, opts) => runReview(source, opts));
 
 program
@@ -148,7 +153,8 @@ program
       const format = formatOpt(opts.format, ['json', 'pretty']);
       if (format === 'pretty') {
         for (const rule of RULE_CATALOG) {
-          process.stdout.write(`${rule.id} ${rule.title} [${rule.severity}/${rule.dimension}]\n  ${rule.summary}\n`);
+          const tag = rule.stability === 'experimental' ? '🧪 ' : '';
+          process.stdout.write(`${tag}${rule.id} ${rule.title} [${rule.severity}/${rule.dimension}]\n  ${rule.summary}\n`);
         }
       } else {
         process.stdout.write(rulesAsJson() + '\n');
@@ -169,7 +175,10 @@ program
       console.error(`Unknown CATES rule: ${ruleId}`);
       process.exit(1);
     }
-    process.stdout.write(`${rule.id} — ${rule.title}\n\nDimension: ${rule.dimension}\nSeverity: ${rule.severity}\nCATES section: ${rule.catesSection}\n\n${rule.summary}\n\nDetection: ${rule.detection}\n\nRemediation: ${rule.remediation}\n`);
+    const stability = rule.stability === 'experimental'
+      ? '\n\n🧪 EXPERIMENTAL — non-normative, not scored, excluded from conformance/CI, SemVer-exempt.'
+      : '';
+    process.stdout.write(`${rule.id} — ${rule.title}\n\nDimension: ${rule.dimension}\nSeverity: ${rule.severity}\nCATES section: ${rule.catesSection}\n\n${rule.summary}\n\nDetection: ${rule.detection}\n\nRemediation: ${rule.remediation}${stability}\n`);
   });
 
 program
@@ -298,6 +307,18 @@ async function executeAnalyze(repoPath: string, opts: Record<string, unknown>, d
   }
 
   const reportResult = displayPath ? { ...result, repoPath: displayPath } : result;
+
+  // Focused experimental view: only the cache/output-shaping section.
+  if (opts.experimentalOnly) {
+    if (format === 'sarif') throw new Error('--experimental-only supports pretty or json output');
+    if (format === 'json') {
+      process.stdout.write(JSON.stringify(result.experimental ?? { enabled: false }, null, 2) + '\n');
+    } else {
+      process.stdout.write(formatExperimental(reportResult) + '\n');
+    }
+    return evaluateResultGates(result, policy, opts);
+  }
+
   const reportText = createReport(reportResult, format);
   process.stdout.write((opts.quiet ? stripPrettyBanner(reportText) : reportText) + '\n');
 
@@ -328,7 +349,20 @@ function buildAnalyzeOptions(
     suppressions: policy.suppressions ?? [],
     rules: policy.rules ?? {},
     dimensions: policy.dimensions ?? {},
+    experimental: experimentalEnabled(opts, policy),
   };
+}
+
+/**
+ * Experimental mode is enabled by any of: the --experimental / --experimental-only
+ * flags, `experimental: true` in policy, or the CATES_EXPERIMENTAL=1 env var
+ * (handy for CI experimentation). Default is off.
+ */
+function experimentalEnabled(opts: Record<string, unknown>, policy: CatesPolicy): boolean {
+  if (opts.experimental === true || opts.experimentalOnly === true) return true;
+  if (policy.experimental === true) return true;
+  const env = process.env.CATES_EXPERIMENTAL;
+  return env === '1' || env === 'true';
 }
 
 function evaluateResultGates(result: AnalysisResult, policy: CatesPolicy, opts: Record<string, unknown>): number {
@@ -537,6 +571,7 @@ function buildCompletionScript(shell: 'bash' | 'zsh'): string {
     '--no-evidence', '--min-score', '--require-level', '--fail-on', '--max-always-loaded',
     '--tokenizer', '--compare-tokenizers', '--fix', '--fix-dry-run', '--demo', '--repos-file',
     '--category', '--limit', '--concurrency', '--keep-worktree', '--no-gh', '--fail-fast',
+    '--experimental', '--experimental-only',
     '--help', '--version',
   ];
 

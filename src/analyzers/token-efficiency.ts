@@ -185,8 +185,10 @@ function checkVerboseExamples(fc: FileContent): Finding[] {
   return findings;
 }
 
-// Filler phrases the platform already handles
-const GENERIC_FILLER_PATTERNS = [
+// Filler phrases the platform already handles. Exported so the optimizer
+// (`cates-optimize`) removes exactly what this analyzer flags as TE003,
+// keeping detection and remediation in lockstep.
+export const GENERIC_FILLER_PATTERNS = [
   { pattern: /you are a helpful assistant/i, label: '"You are a helpful assistant"' },
   { pattern: /please be concise/i, label: '"Please be concise"' },
   { pattern: /respond in (markdown|plain text)/i, label: 'format instructions (platform default)' },

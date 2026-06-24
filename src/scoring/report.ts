@@ -151,12 +151,57 @@ function toPretty(result: AnalysisResult): string {
     }
   }
 
+  if (result.experimental) {
+    lines.push(...experimentalLines(result));
+  }
+
   lines.push('─'.repeat(62));
   lines.push(`  Analyzed: ${result.repoPath}`);
   lines.push(`  Timestamp: ${result.timestamp}`);
   lines.push('');
 
   return lines.join('\n');
+}
+
+/**
+ * Renders the isolated experimental (cache/output-shaping) block. Clearly
+ * labeled as non-scored and subject to change. Empty when experimental mode is
+ * off (no `result.experimental`).
+ */
+export function formatExperimental(result: AnalysisResult): string {
+  if (!result.experimental) {
+    return '🧪 Experimental mode is off. Re-run with --experimental to see cache/output-shaping findings.';
+  }
+  return experimentalLines(result).join('\n');
+}
+
+function experimentalLines(result: AnalysisResult): string[] {
+  const xp = result.experimental;
+  if (!xp) return [];
+  const icons: Record<string, string> = { critical: '🔴', high: '🟠', medium: '🟡', low: '🔵', info: 'ℹ️' };
+  const lines: string[] = [];
+  lines.push('  🧪 Experimental — NOT scored, excluded from conformance & CI, subject to change');
+  for (const dim of xp.dimensions) {
+    lines.push(`     ${padRight(dim.dimension, 16)} ${dim.findings.length} finding(s)   ~${dim.estimatedTokenImpact.toLocaleString()} est. tokens`);
+  }
+  lines.push(`     Estimated token impact (advisory): ~${xp.estimatedTokenImpact.toLocaleString()} tokens`);
+  if (xp.findings.length > 0) {
+    lines.push('');
+    const ordered = [...xp.findings].sort((a, b) => severityRank(a.severity) - severityRank(b.severity));
+    for (const f of ordered) {
+      const icon = icons[f.severity] ?? '•';
+      const cls = f.tokenClass ? ` [${f.tokenClass}]` : '';
+      lines.push(`     ${icon} [${f.ruleId}] ${f.message}`);
+      lines.push(`       └─ ${f.file}${f.line ? ':' + f.line : ''}${cls}`);
+      if (f.suggestion) lines.push(`       💡 ${f.suggestion}`);
+    }
+  } else {
+    lines.push('     ✓ No experimental cache/output-shaping smells detected.');
+  }
+  lines.push('');
+  lines.push(`     ${xp.note}`);
+  lines.push('');
+  return lines;
 }
 
 function toSarif(result: AnalysisResult): string {

@@ -15,6 +15,14 @@ export type Dimension =
   | 'conflict-reachability'
   | 'harness-quality';
 
+// ─── Experimental (non-normative) ────────────────────────────────────────────
+// Experimental dimensions are deliberately a SEPARATE type from `Dimension` so
+// they can never enter `Record<Dimension, …>` scoring weights — the strongest
+// possible isolation. They carry zero scoring weight and are excluded from
+// conformance/CI gates. See docs/EXPERIMENTAL-CACHE-OUTPUT-DIMENSIONS.md.
+export type ExperimentalDimension = 'cache-shaping' | 'output-shaping';
+export type Stability = 'stable' | 'experimental';
+
 export interface Finding {
   ruleId: string;
   dimension: Dimension;
@@ -26,6 +34,39 @@ export interface Finding {
   evidence?: string;
   suggestion?: string;
   tokenImpact?: number; // estimated tokens saved if fixed
+}
+
+/**
+ * An experimental finding. Structurally a Finding but on an experimental
+ * dimension and explicitly stability-marked. These NEVER appear in
+ * `AnalysisResult.findings`; they live only under `AnalysisResult.experimental`.
+ */
+export interface ExperimentalFinding extends Omit<Finding, 'dimension'> {
+  dimension: ExperimentalDimension;
+  stability: 'experimental';
+  /** Which token class the impact estimate refers to (advisory). */
+  tokenClass?: 'cached-input' | 'output';
+}
+
+export interface ExperimentalDimensionScore {
+  dimension: ExperimentalDimension;
+  score: number; // 0-100, display only — carries weight 0, never folded into overall
+  findings: ExperimentalFinding[];
+  estimatedTokenImpact: number; // advisory sum of finding tokenImpact
+  summary: string;
+}
+
+/**
+ * The isolated experimental channel. Present on AnalysisResult only when
+ * experimental mode is enabled. Automation must treat everything here as
+ * non-normative and SemVer-exempt.
+ */
+export interface ExperimentalReport {
+  enabled: boolean;
+  findings: ExperimentalFinding[];
+  dimensions: ExperimentalDimensionScore[];
+  estimatedTokenImpact: number;
+  note: string;
 }
 
 export interface Suppression {
@@ -141,6 +182,12 @@ export interface AnalysisResult {
   disabledFindings?: Finding[];
   disabledRuleIds?: string[];
   disabledDimensions?: Dimension[];
+  /**
+   * Experimental, non-normative channel (cache-shaping / output-shaping).
+   * Present only when experimental mode is enabled. Carries zero scoring weight
+   * and is excluded from conformance and CI gates.
+   */
+  experimental?: ExperimentalReport;
 }
 
 export interface Recommendation {
@@ -196,6 +243,9 @@ export const AnalyzerOptionsSchema = z.object({
       severity: z.enum(['critical', 'high', 'medium', 'low', 'info']).optional(),
     }),
   ).default({}),
+  // Experimental (non-normative) cache/output-shaping analysis. Off by default.
+  // When false, the experimental analyzers are not run at all (no wasted work).
+  experimental: z.boolean().default(false),
 });
 
 export type AnalyzerOptions = z.infer<typeof AnalyzerOptionsSchema>;
