@@ -12,6 +12,7 @@ import { analyzeConflicts } from './conflicts.js';
 import { analyzePrompts, analyzeMcp, analyzeSetupSteps, analyzeHooks, analyzeEditorConfig } from './components.js';
 import { analyzeAgents } from './agents.js';
 import { analyzeCommands } from './commands.js';
+import { analyzeExperimental, type ExperimentalInput } from './experimental.js';
 import { calculateScore } from '../scoring/calculator.js';
 import { generateRecommendations } from '../scoring/recommendations.js';
 import { calculateSavings } from '../scoring/savings.js';
@@ -116,6 +117,21 @@ async function analyzeWithContext(options: AnalyzerOptions): Promise<AnalysisRes
   const recommendations = generateRecommendations(suppressionResult.findings, discovery);
   const savings = calculateSavings(score, discovery, recommendations);
 
+  // Phase 5 (opt-in): Experimental cache/output-shaping. Strictly isolated —
+  // produced only when enabled, written to a separate channel, zero score impact.
+  let experimental: AnalysisResult['experimental'];
+  if (options.experimental) {
+    const experimentalInput: ExperimentalInput[] = discovery.files
+      .filter(f => f.isActive)
+      .map(f => ({
+        relativePath: f.relativePath,
+        content: contents.get(f.path) ?? '',
+        scope: f.scope,
+        type: f.type,
+      }));
+    experimental = analyzeExperimental(experimentalInput, options);
+  }
+
   return {
     repoPath: options.repoPath,
     timestamp: new Date().toISOString(),
@@ -129,5 +145,6 @@ async function analyzeWithContext(options: AnalyzerOptions): Promise<AnalysisRes
     disabledFindings: ruleConfigResult.disabledFindings,
     disabledRuleIds: ruleConfigResult.disabledRuleIds,
     disabledDimensions: ruleConfigResult.disabledDimensions,
+    ...(experimental ? { experimental } : {}),
   };
 }

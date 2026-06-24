@@ -31,6 +31,10 @@ docker run --rm -v "$PWD:/work" cates-analyzer:latest .
 Requires Node.js **>= 20** for the npm install paths. The Docker image
 ships its own runtime plus `git` and `gh`.
 
+The package installs two commands: **`cates-analyzer`** (reports inefficiencies)
+and **`cates-optimize`** (deliberately applies the lossless fixes — see
+[Optimizer](#-optimizer--apply-lossless-fixes-cates-optimize)).
+
 ### Use it
 
 ```bash
@@ -393,7 +397,93 @@ cates-analyzer . --format json > reports/$(git rev-parse --short HEAD).json
 For multi-repo views use `cates-analyzer portfolio <path>` or the demo
 manifest (`cates-analyzer demo --limit 25`).
 
+## ⚡ Optimizer — apply lossless fixes (`cates-optimize`)
 
+The analyzer **reports** what's inefficient. `cates-optimize` is a **separate,
+deliberately-run tool** that **acts on that report**: it rewrites your Copilot
+primitives (instructions, prompts, chat modes, agents, skills, rules files) to be
+as token-efficient as possible **while guaranteeing no loss of function**, then
+prints a report of what it achieved and the estimated efficiency gain.
+
+It is intentionally **not** wired into `cates-analyzer` — you run it on purpose.
+
+### The guarantee
+
+`cates-optimize` only applies **lossless** transforms — it never rewrites,
+reorders, or rescopes guidance. It strips only mechanically-redundant or no-op
+bytes:
+
+| Optimizer | Rule | What it removes |
+| --- | --- | --- |
+| `dedupe-lines` | TE007 | Later exact duplicates of an instruction line (first copy stays) |
+| `dedupe-blocks` | TE007 | Later byte-identical multi-line blocks within a file |
+| `remove-filler` | TE003 | Standalone lines that only restate model defaults (e.g. "You are a helpful assistant") |
+| `whitespace` | — | Trailing whitespace, blank-line runs (code fences untouched) |
+
+Before writing any file, the tool verifies the **meaningful-instruction set** and
+**every code block** are byte-for-byte preserved, then **re-scores with the same
+CATES engine** so the before/after numbers are exact. Anything that needs human
+judgement (restructuring always-loaded context, extracting big code examples,
+rewriting forced verbosity or negative-constraint lists, deduping across files,
+removing secrets) is **left untouched** and surfaced as "remaining opportunities".
+
+Want the strictest purely-mechanical run? Add `--skip remove-filler` to keep only
+whitespace + exact-duplicate removal.
+
+### Use it
+
+```bash
+cates-optimize .                          # optimize the current repo, write changes
+cates-optimize . --dry-run                # preview the gain, write nothing
+cates-optimize . --backup                 # keep a <file>.orig next to each change
+cates-optimize . --format json            # machine-readable achievement report
+
+# Reuse a report you already produced with the analyzer:
+cates-analyzer . --format json > report.json
+cates-optimize --report report.json
+
+cates-optimize --list-optimizers          # show available optimizers
+cates-optimize . --only dedupe-lines,whitespace
+```
+
+The report leads with the headline efficiency gain (token reduction on active and
+always-loaded config), a before/after table (tokens, CATES score, findings), the
+per-file changes, the no-loss-of-function guarantee log, and the remaining
+manual opportunities.
+
+## 🧪 Experimental: cache & output shaping
+
+Input is the *cheapest* token class. Two higher-leverage axes are detectable
+statically and shipped as **experimental, non-normative** rules — **cache-shaping**
+(`CS001`–`CS005`: volatile tokens in the always-loaded prefix, dynamic-before-static
+ordering, …) and **output-shaping** (`OS001`–`OS005`: missing output contract,
+full-file-rewrite mandates, unconditional verbose reasoning, …).
+
+These are **OFF by default, carry zero scoring weight, and are excluded from
+conformance and CI gates** — your score and grade are byte-identical whether the
+flag is on or off. Run them to *see the wider token impact*:
+
+```bash
+cates-analyzer . --experimental         # full report + a labeled experimental section
+cates-analyzer . --experimental-only    # just the cache/output-shaping findings
+CATES_EXPERIMENTAL=1 cates-analyzer .    # or via env var
+cates-optimize . --experimental          # advisory token impact (never auto-applied)
+```
+
+Or opt in via policy:
+
+```yaml
+# .cates.yml
+experimental: true
+rules:
+  OS002: off                  # disable a specific experimental rule
+  CS001: { severity: low }    # or soften one
+```
+
+Findings live in a separate `result.experimental` channel with
+`"stability": "experimental"` and are **SemVer-exempt**. See
+[`docs/EXPERIMENTAL-CACHE-OUTPUT-DIMENSIONS.md`](docs/EXPERIMENTAL-CACHE-OUTPUT-DIMENSIONS.md)
+and `CATES-v1.0.md` §5.4 / §9.9 / §9.10. This is **not part of the standard yet**.
 
 ## 📊 What It Scores
 

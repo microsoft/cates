@@ -22,6 +22,8 @@ export interface CatesPolicy {
   suppressions?: Suppression[];
   rules?: RuleConfigMap;
   dimensions?: DimensionConfigMap;
+  /** Opt in to experimental (non-normative) cache/output-shaping analysis. */
+  experimental?: boolean;
 }
 
 export const DEFAULT_POLICY: Required<Pick<CatesPolicy, 'minScore' | 'requireLevel' | 'failOn' | 'maxAlwaysLoadedTokens'>> = {
@@ -63,6 +65,7 @@ function normalizePolicy(value: unknown): CatesPolicy {
       : undefined,
     rules: parseRuleMap(input['rules']),
     dimensions: parseDimensionMap(input['dimensions']),
+    experimental: typeof input['experimental'] === 'boolean' ? input['experimental'] : undefined,
   };
 }
 

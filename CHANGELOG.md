@@ -15,6 +15,21 @@ Releases are automated via
 > from this analyzer package. Changes to the standard document do not
 > automatically produce a new analyzer release.
 
+## Unreleased
+
+### Features
+
+* **experimental:** add opt-in, non-normative cache-shaping (`CS001`–`CS005`) and
+  output-shaping (`OS001`–`OS005`) dimensions behind `--experimental` /
+  `--experimental-only` / `CATES_EXPERIMENTAL=1` / `experimental: true` in
+  `.cates.yml`. These are **OFF by default, carry zero scoring weight, and are
+  excluded from conformance and CI gates** — `score.overall` and conformance are
+  byte-identical with the flag on or off. Findings live in a separate
+  `result.experimental` channel and are **SemVer-exempt**.
+* **optimizer:** `cates-optimize --experimental` surfaces the estimated
+  cache/output token impact as advisory opportunities (never auto-applied, so the
+  no-loss-of-function guarantee is preserved).
+
 ## 1.2.0 (2026-06-02)
 
 

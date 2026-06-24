@@ -1,12 +1,26 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 import { describe, it, expect } from 'vitest';
-import { RULE_CATALOG, getRule, rulesAsJson } from '../src/rules/catalog.js';
+import { RULE_CATALOG, getRule, rulesAsJson, stableRules, experimentalRules } from '../src/rules/catalog.js';
 import * as lib from '../src/index.js';
 
 describe('rules/catalog', () => {
-  it('has 49 rules (the documented count)', () => {
-    expect(RULE_CATALOG).toHaveLength(49);
+  it('has 49 stable rules and 10 experimental rules (the documented counts)', () => {
+    expect(stableRules()).toHaveLength(49);
+    expect(experimentalRules()).toHaveLength(10);
+    expect(RULE_CATALOG).toHaveLength(59);
+  });
+
+  it('experimental rules are all CS/OS and marked stability experimental', () => {
+    for (const rule of experimentalRules()) {
+      expect(rule.id).toMatch(/^(CS|OS)\d{3}$/);
+      expect(rule.stability).toBe('experimental');
+      expect(['cache-shaping', 'output-shaping']).toContain(rule.dimension);
+    }
+    // Stable rules must never be on an experimental dimension.
+    for (const rule of stableRules()) {
+      expect(rule.stability ?? 'stable').toBe('stable');
+    }
   });
 
   it('getRule returns metadata for known ids and undefined for unknown', () => {

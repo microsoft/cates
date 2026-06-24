@@ -200,6 +200,13 @@ Rules are identified by a prefix indicating their domain and a numeric sequence:
 | EDC | Editor Configuration |
 | AGT | Subagent Definitions |
 | CMD | Slash Commands |
+| CS | Cache-Shaping (🧪 Experimental) |
+| OS | Output-Shaping (🧪 Experimental) |
+
+Rule IDs MAY carry a status marker. A 🧪 **Experimental** marker denotes a
+non-normative rule: it is Informative, carries zero scoring weight, is excluded
+from all conformance classes and profiles, and is exempt from this document's
+versioning guarantees (it MAY change or be removed in a minor revision).
 
 ### 4.3 Severity Levels
 
@@ -222,6 +229,16 @@ Rules are identified by a prefix indicating their domain and a numeric sequence:
 ### 4.5 Normative vs. Informative Content
 
 Sections and annexes are marked as either **Normative** (requirements that MUST be satisfied for conformance) or **Informative** (guidance, examples, and rationale that aid understanding but are not required).
+
+A third status, **Experimental (non-normative)**, applies to content under active
+exploration (currently the §9.9 Cache-Shaping and §9.10 Output-Shaping rules).
+Experimental content is a special case of Informative: it MUST NOT affect a
+repository's score, grade, or conformance level; it is excluded from all
+conformance classes and profiles and from CI gates; and it is exempt from the
+standard's versioning guarantees. Tools MUST keep experimental findings in a
+separate, clearly-labeled channel and MUST require explicit opt-in to produce
+them. Experimental rules graduate to Normative only via a major revision (§14.2),
+because admitting them to scoring changes existing results.
 
 ---
 
@@ -283,6 +300,42 @@ CATES recognizes that security failures frequently manifest as token waste:
 | Injection vulnerabilities | Adversarial payloads expand context → inflated billing |
 
 Security controls frequently improve token efficiency. However, CATES acknowledges exceptions where security measures add token overhead (e.g., prompt protection directives consume ~20 tokens). In such cases, security MUST take precedence over efficiency.
+
+### 5.4 Token Cost Vector (Experimental — Informative)
+
+> 🧪 **Experimental.** This subsection motivates the §9.9/§9.10 experimental
+> rules and is non-normative. It does not change any measurement or score.
+
+The normative model above optimizes **input authoring** (shrinking always-loaded
+config). Under token-based billing, input is only one of three token classes, and
+not the most expensive. A fuller cost vector is:
+
+| Token class | Relative cost | Driver visible in static config? |
+|-------------|---------------|----------------------------------|
+| Cached input | ≈ 0.1× (≈ 90% off) | Partly — **prefix stability** |
+| Uncached input | 1× (baseline) | Yes — config size/scope (the §9.2 rules) |
+| Cache write | ≈ 1.25–2× | Partly |
+| Output | ≈ 2–5× | Partly — output **contract** |
+
+*(Illustrative ratios — Claude-family, 2026; the structural ordering
+`output ≫ uncached-input ≫ cached-input` is stable across vendors, but verify
+exact multipliers per model/provider before quoting them.)*
+
+Two orthogonal, statically-detectable axes follow:
+
+- **Prefix stability (cache).** A request hits the prompt cache only when its
+  leading tokens are byte-identical to a prior request. Volatile tokens (dates,
+  UUIDs, SHAs) or variable-before-static ordering in the always-loaded prefix
+  bust the cache every call. See §9.9.
+- **Output contract.** Because output is the priciest class, config that fails to
+  bound output — or mandates full-file rewrites, unconditional verbose reasoning,
+  or echoing — provably inflates the most expensive tokens. See §9.10.
+
+Both axes can be improved **without changing any instruction's meaning**, so
+functionality is preserved by construction. Actual cache-hit %, output:input
+ratio, and reasoning-token share are **runtime** signals outside CATES's
+static scope (§11) and are deferred to a future Informative annex on
+Token-Economics Telemetry.
 
 ---
 
@@ -431,6 +484,10 @@ CATES defines three conformance classes, applicable to different subjects:
 | **Repository Conformance** | A source code repository | The repository's configuration files satisfy all applicable rules at the claimed level |
 | **Tool Conformance** | An analysis tool | The tool correctly implements CATES measurement and produces findings consistent with the reference implementation |
 | **Organizational Conformance** | An enterprise program | The organization has governance, measurement, and remediation processes aligned with CATES |
+
+Experimental rules (§9.9, §9.10) are excluded from every conformance class and
+profile. A repository's conformance level MUST be determined from Normative rules
+only; experimental findings never cause a conformance failure.
 
 ### 8.2 Conformance Profiles
 
@@ -1059,6 +1116,148 @@ Custom subagents and slash commands are distinct configuration surfaces: a subag
 
 ---
 
+### 9.9 Cache-Shaping Rules (🧪 Experimental — Informative)
+
+> 🧪 **Experimental — Informative.** The rules in §9.9 and §9.10 are
+> non-normative: zero scoring weight, excluded from conformance and CI gates,
+> off by default, and SemVer-exempt (§14.2). Severities are **advisory** (they aid
+> prioritization but never gate or score). Prefix `CS`. See §5.4 for motivation.
+
+These rules flag statically-detectable config patterns that wreck prompt-cache
+hit-rate by destabilizing the cacheable prefix. They do not measure runtime cache
+behavior (§11).
+
+#### CS001 — Volatile Tokens in Always-Loaded Config
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | cache-shaping (experimental) |
+| Severity | High (advisory) |
+| Applicability | Always-loaded configuration |
+
+**Detection:** An always-loaded file embeds volatile values — timestamps/dates, UUIDs, build numbers, git SHAs — or a "current date/time" directive.
+
+**Rationale:** Volatile tokens in the prefix change between calls, so every request misses the cache and pays full (≈10×) input price on the whole prefix.
+
+**Remediation:** Move volatile values out of the always-loaded prefix; supply them via tool inputs at the end of context.
+
+#### CS002 — Dynamic-Before-Static Ordering
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | cache-shaping (experimental) |
+| Severity | Medium (advisory) |
+| Applicability | Prompt/instruction templates |
+
+**Detection:** A variable placeholder (`${…}`, `{{…}}`) or `@include` appears ahead of a large static block, minimizing the cacheable prefix.
+
+**Remediation:** Put stable, static content first; place variable/dynamic content at the end.
+
+#### CS003 — Non-Deterministic Context Directive
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | cache-shaping (experimental) |
+| Severity | Medium (advisory) |
+| Applicability | Instruction-bearing configuration |
+
+**Detection:** Instructions inject live/volatile state into the preamble (e.g. "always include current git status / latest logs / today's date").
+
+**Remediation:** Fetch volatile state on-demand via tools rather than embedding it in always-loaded instructions.
+
+#### CS004 — Unstable Tool/Context Ordering
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | cache-shaping (experimental) |
+| Severity | Low (advisory) |
+| Applicability | Instruction-bearing configuration |
+
+**Detection:** Directives that randomize or re-sort tool lists / retrieved context per call.
+
+**Remediation:** Keep tool and context ordering stable and deterministic across calls.
+
+#### CS005 — Fragmented Preamble (No Shared Prelude)
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | cache-shaping (experimental) |
+| Severity | Info (advisory) |
+| Applicability | Multiple configuration files |
+
+**Detection:** High cross-file near-duplication of preamble that could be one shared, cacheable prelude (correlates with TE006).
+
+**Remediation:** Hoist the shared preamble into a single, stable, precedence-appropriate prelude.
+
+### 9.10 Output-Shaping Rules (🧪 Experimental — Informative)
+
+> 🧪 **Experimental — Informative.** See the §9.9 banner. Prefix `OS`. Output is
+> the priciest token class (≈ 2–5× input), so these advisory rules target config
+> that provably inflates output. Overlaps with TE004/CNF002 are intentional and
+> may merge at graduation.
+
+#### OS001 — Missing Output Contract
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | output-shaping (experimental) |
+| Severity | Medium (advisory) |
+| Applicability | Substantial instruction-bearing configuration |
+
+**Detection:** Config never bounds output (no length cap, no "code only / no preamble", no format spec). Complements TE004 (which flags *forced* verbosity; OS001 flags *absent* bounds).
+
+**Remediation:** Add a concise output contract, e.g. "Default to code only with no preamble; explain only when asked."
+
+#### OS002 — Full-File Rewrite Mandate
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | output-shaping (experimental) |
+| Severity | High (advisory) |
+| Applicability | Instruction-bearing configuration |
+
+**Detection:** Instructions require emitting entire files instead of diffs/patches ("return the complete file").
+
+**Remediation:** Prefer diffs/patches or targeted edits; reserve full-file output for newly created files.
+
+#### OS003 — Unconditional Verbose Reasoning
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | output-shaping (experimental) |
+| Severity | Medium (advisory) |
+| Applicability | Instruction-bearing configuration |
+
+**Detection:** Forces detailed chain-of-thought/explanation on every response regardless of task.
+
+**Remediation:** Make reasoning depth conditional on task complexity rather than global.
+
+#### OS004 — Output Echo / Restatement
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | output-shaping (experimental) |
+| Severity | Low (advisory) |
+| Applicability | Instruction-bearing configuration |
+
+**Detection:** Instructs the agent to restate the prompt, echo inputs, or repeat context back.
+
+**Remediation:** Remove echo/restatement requirements; have the agent act directly.
+
+#### OS005 — Verbose Format Mandate
+
+| Attribute | Value |
+|-----------|-------|
+| Dimension | output-shaping (experimental) |
+| Severity | Info (advisory) |
+| Applicability | Instruction-bearing configuration |
+
+**Detection:** Requires heavyweight formatting (decorative sections, full tables) on every response where compact output suffices.
+
+**Remediation:** Default to compact output; reserve rich formatting for when it is explicitly requested.
+
+---
+
 ## 10. Scoring Methodology
 
 ### 10.1 Dimensions and Weights
@@ -1071,6 +1270,11 @@ Custom subagents and slash commands are distinct configuration surfaces: a subag
 | Completeness | 0.15 | Gaps cause agent confusion and retry waste |
 | Conflict-Reachability | 0.10 | Contradictions cause unpredictable behavior |
 | Harness Quality | 0.10 | Setup/environment quality affects agent effectiveness |
+
+The six dimensions above sum to 1.0 and are the only inputs to `score.overall`.
+The experimental dimensions **Cache-Shaping** and **Output-Shaping** (§9.9, §9.10)
+carry **weight 0**: they are never folded into the overall score or grade and are
+reported only in a separate, opt-in experimental channel.
 
 ### 10.2 Score Calculation
 
@@ -1127,6 +1331,7 @@ To produce reproducible results, CATES measurements MUST be performed under thes
 4. **Traversal boundary:** The repository root. Symlinks pointing outside this boundary MUST be excluded.
 5. **File limits:** Maximum 50 configuration files, maximum 100KB per file, maximum depth 5 directories.
 6. **Binary exclusion:** Files with >10% non-printable characters or containing null bytes MUST be excluded.
+7. **Static scope:** Measurement is static analysis of configuration at rest — no execution, no LLM calls, no runtime telemetry. Experimental cache/output-shaping rules (§9.9, §9.10) therefore detect *predictive config smells*, not actual cache-hit % or output:input ratios; the latter are runtime signals deferred to a future Informative annex on Token-Economics Telemetry.
 
 ### 11.2 Invocation Assumptions
 

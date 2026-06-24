@@ -14,6 +14,10 @@ export default defineConfig({
       include: ['src/**/*.ts', 'service/**/*.ts'],
       exclude: [
         'src/cli/**',
+        // The optimizer CLI is thin argument-parsing/glue around optimize();
+        // excluded for the same reason as src/cli/** (its logic is covered via
+        // tests/optimizer.test.ts driving optimize() and the report renderer).
+        'src/optimizer/cli.ts',
         // demo.ts is CLI orchestration that drives real GitHub clones
         // through analyze(); only its pure helpers are testable without
         // network. The exercised paths still get coverage via
