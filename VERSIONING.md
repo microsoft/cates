@@ -75,6 +75,10 @@ will now fail unless `.cates.yml` lowers the severity.
 
 ## Release flow
 
+The workflow requires a `RELEASE_PLEASE_TOKEN` Actions secret for a user that
+can update branches under the repository ruleset. Without that secret, the
+workflow exits successfully without creating or updating a Release PR.
+
 1. Land Conventional Commits on `main`.
 2. `release-please` opens / updates a **Release PR** that bumps
    `package.json`, updates `CHANGELOG.md`, and updates
