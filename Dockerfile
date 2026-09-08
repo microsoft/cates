@@ -41,7 +41,10 @@ FROM ${NODE_IMAGE} AS runtime
 #   github-cli - preferred clone path when available
 #   ca-certs   - HTTPS to github.com
 #   tini       - PID 1 to reap zombies (matters in k8s Jobs)
-RUN apk add --no-cache git github-cli ca-certificates tini \
+RUN apk upgrade --no-cache \
+ && apk add --no-cache git github-cli ca-certificates tini \
+ && rm -rf /usr/local/lib/node_modules/npm \
+ && rm -f /usr/local/bin/npm /usr/local/bin/npx \
  && addgroup -S cates && adduser -S -G cates -h /home/cates cates \
  && mkdir -p /work /home/cates/.config/gh \
  && chown -R cates:cates /work /home/cates
