@@ -3,8 +3,8 @@ mode: cronjob
 schedule: "0 6 * * 1-5"   # weekdays 06:00 UTC
 
 image:
-  repository: cates-analyzer
-  tag: "1.0.0"
+  repository: ghcr.io/microsoft/cates
+  tag: ""
 
 args:
   - "demo"

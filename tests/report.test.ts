@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { createReport } from '../src/scoring/report.js';
 import type { AnalysisResult, Finding, Recommendation } from '../src/types.js';
+import { ANALYZER_VERSION } from '../src/version.js';
 
 function syntheticResult(opts: { findings?: Finding[]; recs?: Recommendation[]; grade?: AnalysisResult['score']['grade'] } = {}): AnalysisResult {
   return {
@@ -83,6 +84,7 @@ describe('createReport', () => {
       expect(parsed.$schema).toMatch(/sarif-schema-2\.1\.0\.json$/);
       expect(parsed.runs).toHaveLength(1);
       expect(parsed.runs[0].tool.driver.name).toBe('cates-analyzer');
+      expect(parsed.runs[0].tool.driver.version).toBe(ANALYZER_VERSION);
       expect(parsed.runs[0].results).toHaveLength(1);
       const r = parsed.runs[0].results[0];
       expect(r.ruleId).toBe('SEC001');

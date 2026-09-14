@@ -82,19 +82,23 @@ workflow exits successfully without creating or updating a Release PR.
 1. Land Conventional Commits on `main`.
 2. `release-please` opens / updates a **Release PR** that bumps
    `package.json`, updates `CHANGELOG.md`, and updates
-   `.release-please-manifest.json`.
+   `.release-please-manifest.json`. It also keeps the Helm chart
+   `appVersion` synchronized with the analyzer package.
 3. Merging the Release PR:
    - Tags the commit `vX.Y.Z`
    - Creates a GitHub Release with the changelog excerpt
-4. (Future) Tag pushes can drive npm publish and Docker image tagging.
+4. The tag push runs the npm publish workflow, which validates the package,
+   generates a CycloneDX SBOM, and publishes with npm provenance.
+5. The same tag publishes multi-architecture container images to
+   `ghcr.io/microsoft/cates` with provenance and an SBOM.
 
 ---
 
 ## Tagging conventions
 
 - Git tags: `vMAJOR.MINOR.PATCH` (e.g., `v1.2.0`).
-- Docker images should be tagged with the same `vMAJOR.MINOR.PATCH`, plus
-  rolling `MAJOR.MINOR`, `MAJOR`, and `latest` aliases on stable releases.
+- Docker images are published without the `v` prefix using `MAJOR.MINOR.PATCH`,
+  rolling `MAJOR.MINOR`, `MAJOR`, and `latest` tags.
 - Helm chart `appVersion` tracks the analyzer version; the chart's own
   `version` follows SemVer for chart-shape changes.
 

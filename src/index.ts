@@ -21,6 +21,7 @@ export type { AnalyzeInMemoryFile, AnalyzeInMemoryOptions } from './analyze-in-m
 export { createReport } from './scoring/report.js';
 export { evaluateConformance, evaluateGates } from './conformance.js';
 export { RULE_CATALOG, getRule } from './rules/catalog.js';
+export { ANALYZER_VERSION } from './version.js';
 export type { AnalysisResult, Finding, Score, AnalyzerOptions } from './types.js';
 
 // Optimizer: a separate, deliberately-invoked tool that rewrites primitives for

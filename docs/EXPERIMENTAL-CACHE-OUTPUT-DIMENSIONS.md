@@ -1,18 +1,18 @@
-# Proposal: Experimental Cache-Shaping & Output-Shaping Dimensions
+# Experimental Cache-Shaping & Output-Shaping Dimensions
 
-> 🧪 **Status: EXPERIMENTAL PROPOSAL — non-normative.**
+> 🧪 **Status: IMPLEMENTED, EXPERIMENTAL — non-normative.**
 > Everything described here ships **off by default**, carries **zero scoring weight**,
 > is **excluded from conformance and CI gates**, and is **SemVer-exempt** (rules may
 > change or be removed in a minor release). Nothing here changes a repository's existing
 > CATES score or conformance level unless a user explicitly opts in.
 
-**Target version:** `cates-analyzer` 1.3.0 (minor) · **Owner:** TBD · **Created:** 2026-06-24
+**Release target:** `cates-analyzer` 1.3.0 (minor) · **Created:** 2026-06-24 · **Implementation verified:** 2026-09-14
 
 ---
 
 ## 1. Summary
 
-CATES today optimizes one token class: **input** (the `token-efficiency` dimension shrinks
+CATES's stable score optimizes one token class: **input** (the `token-efficiency` dimension shrinks
 always-loaded config). But under token-based billing, input is the *cheapest* class. Two
 higher-leverage classes are unaddressed:
 
@@ -24,7 +24,7 @@ higher-leverage classes are unaddressed:
 *(Illustrative ratios — Claude-family, 2026; verify per model/provider. The structural
 ordering `output ≫ uncached-input ≫ cached-input` is stable across vendors.)*
 
-This proposal adds two **experimental** scoring dimensions — `cache-shaping` and
+The implementation adds two **experimental** scoring dimensions — `cache-shaping` and
 `output-shaping` — that flag the **statically-detectable** config smells which wreck cache
 hit-rate or inflate output, **without** touching the established score until the rules earn
 graduation.
@@ -240,13 +240,13 @@ Leverage the existing §4.5 *Normative vs. Informative* split — experimental c
 
 ## 9. Phased rollout
 
-- [ ] **Phase 0 — Spec groundwork.** §4.5/§5 edits + the experimental marker convention. No code.
-- [ ] **Phase 1 — Engine plumbing (zero rules).** Experimental channel in `types.ts`, the
+- [x] **Phase 0 — Spec groundwork.** §4.5/§5 edits + the experimental marker convention. No code.
+- [x] **Phase 1 — Engine plumbing (zero rules).** Experimental channel in `types.ts`, the
       `experimental` policy flag, CLI flags, report section, scoring isolation, guardrail
       tests. Ship with **no active rules** to validate isolation in production first.
-- [ ] **Phase 2 — Cache-Shaping.** `cache-shaping.ts` + `CS001–CS005` + fixtures + tests + §9.9.
-- [ ] **Phase 3 — Output-Shaping.** `output-shaping.ts` + `OS001–OS005` + fixtures + tests + §9.10.
-- [ ] **Phase 4 — Docs & DX.** `docs/RULE-CATALOG.md` experimental section, this guide linked
+- [x] **Phase 2 — Cache-Shaping.** `cache-shaping.ts` + `CS001–CS005` + fixtures + tests + §9.9.
+- [x] **Phase 3 — Output-Shaping.** `output-shaping.ts` + `OS001–OS005` + fixtures + tests + §9.10.
+- [x] **Phase 4 — Docs & DX.** `docs/RULE-CATALOG.md` experimental section, this guide linked
       from README (with a 🧪 note), `examples/`, `explain`/`rules` 🧪 markers.
 - [ ] **Phase 5 — Future (separate proposal).** Annex G telemetry + `cates-rt` ingest.
 
