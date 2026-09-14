@@ -36,7 +36,9 @@ Releases are automated via
   builds.
 * Upgrade stable direct dependencies, including Chalk 6, TypeScript 7, and
   Vitest 5.
-* Pin GitHub Actions to current full-length commit SHAs.
+* Pin release, CI, Scorecard, and Trivy Actions to current full-length commit
+  SHAs. The CodeQL workflow remains unchanged so pull requests retain the
+  configuration identity needed for introduced-alert comparisons.
 * Publish multi-architecture GHCR images with provenance and an SBOM on release
   tags.
 * Keep CLI and SARIF version metadata synchronized with `package.json`.
