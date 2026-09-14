@@ -4,11 +4,24 @@
   "description": "Analyze coding agent configurations for token efficiency, security, and CATES conformance",
   "type": "module",
   "bin": {
-    "cates-analyzer": "./dist/cli/index.js",
-    "cates-optimize": "./dist/optimizer/cli.js"
+    "cates-analyzer": "dist/cli/index.js",
+    "cates-optimize": "dist/optimizer/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/microsoft/cates.git"
+  },
+  "bugs": {
+    "url": "https://github.com/microsoft/cates/issues"
+  },
+  "homepage": "https://github.com/microsoft/cates#readme",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -35,7 +48,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "tsc --noEmit && tsc --noEmit -p tsconfig.service.json",
-    "prepublishOnly": "npm run build && npm test",
+    "prepublishOnly": "npm run typecheck:all && npm run test:coverage && npm run build",
+    "release:check": "npm run typecheck:all && npm run test:coverage && npm run build && npm pack --dry-run",
     "typecheck": "tsc --noEmit",
     "typecheck:service": "tsc --noEmit -p tsconfig.service.json",
     "typecheck:all": "npm run typecheck && npm run typecheck:service",
@@ -54,27 +68,27 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.12.0"
   },
   "dependencies": {
     "@anthropic-ai/tokenizer": "^0.0.4",
-    "chalk": "^5.4.1",
+    "chalk": "^6.0.0",
     "commander": "^15.0.0",
     "express": "^5.2.1",
-    "helmet": "^8.2.0",
+    "helmet": "^8.3.0",
     "js-tiktoken": "^1.0.18",
-    "ora": "^9.4.0",
+    "ora": "^9.4.1",
     "yaml": "^2.9.0",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "@types/node": "^25.9.1",
-    "@types/supertest": "^7.2.0",
-    "@vitest/coverage-v8": "^4.1.8",
+    "@types/node": "^22.20.1",
+    "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "^5.0.0",
     "supertest": "^7.2.2",
-    "tsx": "^4.22.4",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
   }
 }

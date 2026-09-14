@@ -3,7 +3,7 @@
 ## Quick start
 
 ```bash
-npm install
+npm ci
 npm run build
 npx tsx src/cli/index.ts analyze . --format json > report.json
 ```

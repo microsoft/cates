@@ -6,7 +6,7 @@ description: |
   (scheduled portfolio scans).
 type: application
 version: 0.1.0
-appVersion: "1.0.0"
+appVersion: "1.2.0" # x-release-please-version
 keywords:
   - cates
   - coding-agent

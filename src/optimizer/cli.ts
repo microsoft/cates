@@ -11,6 +11,7 @@ import { renderOptimizationReport, type OptimizationReportFormat } from './repor
 import { loadPolicy } from '../policy.js';
 import { isTokenizerId, listTokenizers, type TokenizerId } from '../utils/tokenizer.js';
 import type { AnalysisResult } from '../types.js';
+import { ANALYZER_VERSION } from '../version.js';
 
 /** Thrown for user input mistakes (bad flag/value) so the CLI can exit with 2. */
 class UsageError extends Error {}
@@ -29,7 +30,7 @@ program
     '(instructions, prompts, chat modes, agents, skills, rules) and report the gain. ' +
     'Guarantees no loss of function. Separate from cates-analyzer — run it deliberately.',
   )
-  .version('1.0.0')
+  .version(ANALYZER_VERSION)
   .argument('[path]', 'Path to repository root', '.')
   .option('-f, --format <format>', 'Report format: markdown or json', 'markdown')
   .option('--report <file>', 'Reuse a prior `cates-analyzer --format json` report as the baseline')

@@ -237,7 +237,7 @@ export function generateRecommendations(
       tokenSavings: 0,
       effort: 'easy',
       before: '- run: npm ci',
-      after: '- uses: actions/setup-node@v4\n  with:\n    cache: npm\n- run: npm ci',
+      after: '- uses: actions/setup-node@v7\n  with:\n    cache: npm\n- run: npm ci',
     });
   }
 

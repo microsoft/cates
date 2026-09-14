@@ -17,11 +17,12 @@ import { scanDemo, type DemoScanResult } from '../demo.js';
 import { isTokenizerId, listTokenizers, type TokenizerId } from '../utils/tokenizer.js';
 import { formatExperimental } from '../scoring/report.js';
 import type { AnalysisResult, Severity } from '../types.js';
+import { ANALYZER_VERSION } from '../version.js';
 
 program
   .name('cates-analyzer')
   .description('Analyze coding agent configurations for token efficiency, security, and CATES conformance')
-  .version('1.0.0')
+  .version(ANALYZER_VERSION)
   .addHelpText('after', `
 Exit codes:
   0  Analysis succeeded and all CI gates passed

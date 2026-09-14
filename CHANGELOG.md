@@ -30,6 +30,23 @@ Releases are automated via
   cache/output token impact as advisory opportunities (never auto-applied, so the
   no-loss-of-function guarantee is preserved).
 
+### Build System
+
+* Require Node.js 22.12 or newer and use Node.js 24 for release and container
+  builds.
+* Upgrade stable direct dependencies, including Chalk 6, TypeScript 7, and
+  Vitest 5.
+* Pin GitHub Actions to current full-length commit SHAs.
+* Publish multi-architecture GHCR images with provenance and an SBOM on release
+  tags.
+* Keep CLI and SARIF version metadata synchronized with `package.json`.
+* Preserve both executable entry points during npm publication and declare
+  public registry and repository provenance metadata.
+
+### Documentation
+
+* Synchronize Helm release metadata and current test and coverage figures.
+
 ## 1.2.0 (2026-06-02)
 
 

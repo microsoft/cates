@@ -29,8 +29,7 @@ export default defineConfig({
       // suite grows; never reduce silently.
       thresholds: {
         statements: 88,
-        // Vitest v4 reports branch coverage slightly lower than v3 for this
-        // suite; keep the floor aligned with the current enforced baseline.
+        // Keep the floor aligned with the current enforced baseline.
         branches: 82,
         functions: 92,
         lines: 88,

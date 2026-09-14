@@ -23,15 +23,15 @@ for the proper disclosure process.
 
 Prerequisites:
 
-- Node.js 20 or newer
+- Node.js 22.12 or newer
 - npm 10 or newer
 
 Set up and verify a clean checkout:
 
 ```bash
-npm install
+npm ci
 npm run typecheck:all
-npm test
+npm run test:coverage
 npm run build
 ```
 
@@ -39,14 +39,20 @@ Other useful scripts:
 
 - `npm run lint` — type-checks both the CLI and the service workspace (acts as our lint pass).
 - `npm run test:coverage` — runs the Vitest suite with coverage.
+- `npm run release:check` — runs release validation and previews the npm tarball.
 - `npm pack --dry-run` — previews the published tarball.
+
+`npm outdated` intentionally reports `@types/node` and may report `yaml`.
+The Node types stay on the oldest supported runtime major (22) to prevent
+accidental use of newer APIs, and prerelease dependency versions are not
+adopted for stable releases.
 
 ## Pull requests
 
 1. Fork the repo and create a topic branch from `main`.
 2. Make focused, minimal changes. Keep unrelated refactoring out of the PR.
 3. Add or update tests for any behavior changes.
-4. Run `npm test` and `npm run build` locally and confirm both pass.
+4. Run `npm run release:check` locally and confirm it passes.
 5. Open a PR against `main`. Include a clear description of the change and the motivation.
 
 ## Commit messages

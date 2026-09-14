@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 import type { AnalysisResult } from '../types.js';
 import { getRule } from '../rules/catalog.js';
+import { ANALYZER_VERSION } from '../version.js';
 
 /**
  * Format analysis results for different output targets.
@@ -212,7 +213,7 @@ function toSarif(result: AnalysisResult): string {
       tool: {
         driver: {
               name: 'cates-analyzer',
-          version: '1.0.0',
+          version: ANALYZER_VERSION,
           rules: [...new Set(result.findings.map(f => f.ruleId))].map(id => {
             const finding = result.findings.find(f => f.ruleId === id)!;
             const rule = getRule(id);
