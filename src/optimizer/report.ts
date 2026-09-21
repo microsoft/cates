@@ -25,6 +25,13 @@ function reduction(before: number, after: number): string {
   return `−${n(saved)} (−${pct}%)`;
 }
 
+export function escapeMarkdownTableCell(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\r?\n/g, '<br>');
+}
+
 function toMarkdown(r: OptimizationResult): string {
   const lines: string[] = [];
   const mode = r.dryRun ? 'Dry run (no files written)' : 'Applied';
@@ -146,7 +153,7 @@ function toMarkdown(r: OptimizationResult): string {
       lines.push('| --- | --- | --- | --- | --- |');
       for (const f of xp.findings) {
         const where = `${f.file}${f.line ? ':' + f.line : ''}`;
-        lines.push(`| ${f.ruleId} | ${f.severity} | \`${where}\` | ${f.tokenClass ?? '—'} | ${f.message.replace(/\|/g, '\\|')} |`);
+        lines.push(`| ${escapeMarkdownTableCell(f.ruleId)} | ${escapeMarkdownTableCell(f.severity)} | \`${escapeMarkdownTableCell(where)}\` | ${escapeMarkdownTableCell(f.tokenClass ?? '—')} | ${escapeMarkdownTableCell(f.message)} |`);
       }
     }
     lines.push('');

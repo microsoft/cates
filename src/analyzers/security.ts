@@ -295,6 +295,7 @@ const AUTONOMY_PATTERNS: Array<{
   label: string;
   severity: Finding['severity'];
   confidence: Finding['confidence'];
+  negationAware?: boolean;
 }> = [
   {
     pattern: /--dangerously-skip-permissions/i,
@@ -343,8 +344,15 @@ const AUTONOMY_PATTERNS: Array<{
     label: 'Acts without human approval/confirmation',
     severity: 'high',
     confidence: 'medium',
+    negationAware: true,
   },
 ];
+
+function isProhibitionContext(line: string, matchIndex: number): boolean {
+  const clausePrefix = line.slice(0, matchIndex).split(/[.;:!?]/).at(-1) ?? '';
+  return /\b(?:do not|don't|never|must not|may not|cannot|can't|avoid|prohibit(?:ed)?)\b/i.test(clausePrefix)
+    || /\bno\s+(?:action|change|command|edit|merge|operation|tool)\b/i.test(clausePrefix);
+}
 
 function checkAutonomyBypass(lines: string[], file: string): Finding[] {
   const findings: Finding[] = [];
@@ -352,8 +360,10 @@ function checkAutonomyBypass(lines: string[], file: string): Finding[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     if (!isScannableLine(line)) continue;
-    for (const { pattern, label, severity, confidence } of AUTONOMY_PATTERNS) {
-      if (pattern.test(line)) {
+    for (const { pattern, label, severity, confidence, negationAware } of AUTONOMY_PATTERNS) {
+      const match = pattern.exec(line);
+      if (match) {
+        if (negationAware && isProhibitionContext(line, match.index)) continue;
         findings.push({
           ruleId: 'SEC007',
           dimension: 'security',

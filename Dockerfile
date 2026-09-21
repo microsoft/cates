@@ -8,10 +8,10 @@
 #   - distroless was considered but rejected: cates shells out to `git`
 #     and `gh` to clone repos for review, which distroless can't host.
 #
-# Pin the base via build arg so consumers can lock to a digest:
-#   docker build --build-arg NODE_IMAGE=node:24-alpine@sha256:... .
+# Dependabot updates both the tag and digest so base-image changes remain
+# explicit, reviewable, and reproducible.
 
-ARG NODE_IMAGE=node:24-alpine
+ARG NODE_IMAGE=node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
 
 # ---------- deps stage: install full deps + build TS ----------
 FROM ${NODE_IMAGE} AS build

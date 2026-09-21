@@ -14,10 +14,15 @@ on:
 
 permissions: read-all
 
+concurrency:
+  group: scorecard-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analysis:
     name: Scorecard analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       security-events: write   # upload SARIF
       id-token: write          # publish results to https://api.scorecard.dev

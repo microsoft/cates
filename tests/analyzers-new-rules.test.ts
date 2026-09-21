@@ -39,6 +39,36 @@ describe('SEC007 — autonomy / approval bypass', () => {
     ]);
     expect(f.some(x => x.ruleId === 'SEC007')).toBe(false);
   });
+
+  it('does NOT flag a prohibition on changes without approval', async () => {
+    const f = await findingsFor([
+      { path: 'AGENTS.md', content: '# Scope\nDo not change migrations, lockfiles, or generated files without approval.' },
+    ]);
+    expect(f.some(x => x.ruleId === 'SEC007')).toBe(false);
+  });
+});
+
+describe('CNF002 — harness quality precision', () => {
+  it('recognizes an Output heading as an output constraint', async () => {
+    const f = await findingsFor([
+      {
+        path: 'AGENTS.md',
+        content: [
+          '# Scope',
+          '- Restrict changes to src and tests.',
+          '# Failure handling',
+          '- If validation fails, report the failure.',
+          '# Output',
+          '- Be concise for simple fixes.',
+          '# Prohibited actions',
+          '- Do not expose secrets.',
+          '# Verification',
+          '- Run tests after edits.',
+        ].join('\n'),
+      },
+    ]);
+    expect(f.some(x => x.ruleId === 'CNF002' && /Output format constraints/.test(x.message))).toBe(false);
+  });
 });
 
 describe('SEC002 — injection precision', () => {

@@ -12,7 +12,10 @@ import {
   meaningfulSignature,
   type Optimizer,
 } from '../src/optimizer/optimizers.js';
-import { renderOptimizationReport } from '../src/optimizer/report.js';
+import {
+  escapeMarkdownTableCell,
+  renderOptimizationReport,
+} from '../src/optimizer/report.js';
 
 function byId(id: string): Optimizer {
   const found = OPTIMIZERS.find(o => o.id === id);
@@ -338,6 +341,10 @@ describe('renderOptimizationReport', () => {
     expect(parsed.efficiencyGainPct).toBeGreaterThan(0);
     expect(parsed.guarantee.noLossOfFunction).toBe(true);
     expect(Array.isArray(parsed.files)).toBe(true);
+  });
+
+  it('escapes backslashes, table delimiters, and newlines in table cells', () => {
+    expect(escapeMarkdownTableCell('a\\|b\r\nc')).toBe(String.raw`a\\\|b<br>c`);
   });
 
   it('reports "already optimal" when nothing can be saved', async () => {

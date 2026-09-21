@@ -42,10 +42,10 @@ Other useful scripts:
 - `npm run release:check` — runs release validation and previews the npm tarball.
 - `npm pack --dry-run` — previews the published tarball.
 
-`npm outdated` intentionally reports `@types/node` and may report `yaml`.
-The Node types stay on the oldest supported runtime major (22) to prevent
-accidental use of newer APIs, and prerelease dependency versions are not
-adopted for stable releases.
+Keep dependencies current within their supported release lines. The Node
+types stay on the oldest supported runtime major (22) to prevent accidental
+use of newer runtime APIs; patch and minor updates within that major are
+expected. Prerelease dependency versions are not adopted for stable releases.
 
 ## Pull requests
 
