@@ -8,32 +8,31 @@ This is the reference implementation for the **Coding Agent Token Economics Stan
 
 ## 🚀 Quick Start
 
+> **Distribution status:** This repository is release-ready, but no version tag
+> or GHCR package has been published yet. Use the source-checkout instructions
+> below until the first GitHub release is available.
+
 ### Install
 
-CATES is distributed as an npm package and a Docker image. Pick one:
+Build and run the current source:
 
 ```bash
-# 1) Run it once with npx (nothing to install)
-npx cates-analyzer .
-
-# 2) Install globally (recommended for repeat use)
-npm install -g cates-analyzer
-cates-analyzer .
-
-# 3) Add it as a dev dependency in a project
-npm install --save-dev cates-analyzer
-npx cates-analyzer .
-
-# 4) Run the published image (no Node.js required locally)
-docker run --rm -v "$PWD:/work" ghcr.io/microsoft/cates:latest .
+git clone https://github.com/microsoft/cates.git
+cd cates
+npm ci
+npm run build
+node dist/cli/index.js .
 ```
 
-Requires Node.js **>= 22.12** for the npm install paths. The Docker image
-ships its own runtime plus `git` and `gh`.
+Requires Node.js **>= 22.12** and npm **>= 10**. After the first release,
+the npm and GHCR installation paths documented in the release notes become
+the recommended options.
 
 The package installs two commands: **`cates-analyzer`** (reports inefficiencies)
 and **`cates-optimize`** (deliberately applies the lossless fixes — see
 [Optimizer](#-optimizer--apply-lossless-fixes-cates-optimize)).
+The programmatic package API is ESM-only; CommonJS callers must use dynamic
+`import()`.
 
 ### Use it
 
@@ -89,9 +88,6 @@ toolchain across Windows, macOS, and Linux (plus the right `git` and `gh`
 versions baked in).
 
 ```bash
-# Pull the latest published image
-docker pull ghcr.io/microsoft/cates:latest
-
 # Build locally
 docker build -t cates-analyzer .
 
@@ -112,6 +108,8 @@ Windows PowerShell users substitute `${PWD}` for `$PWD`.
 
 The image runs as a non-root user, uses a read-only root filesystem, and
 ships with `tini` as PID 1 so it behaves cleanly under container orchestrators.
+Published `ghcr.io/microsoft/cates` tags become available with the first
+GitHub release.
 
 ## ☸️ Helm chart
 
@@ -177,7 +175,7 @@ display them or pre-validate.
 ### Configuration parity
 
 Every toggle and policy field from
-[`⚙️ Configuring CATES`](#%EF%B8%8F-configuring-cates) is accepted in the
+[`Configuring CATES`](#configuring-cates) is accepted in the
 `policy` field of the request body:
 
 ```json
@@ -264,6 +262,7 @@ score updates immediately and the result includes `disabledRuleIds` /
 | **Hardened runtime** | Sandboxed reads, argv-injection guards, size/depth limits, binary detection, no network calls in analyze mode |
 | **Multiple ship targets** | npm CLI, Docker image, Helm chart, and local HTTP service |
 
+<a id="configuring-cates"></a>
 ## ⚙️ Configuring CATES
 
 CATES is policy-driven. Drop a `.cates.yml`, `.cates.yaml`, or `.cates.json`
@@ -626,7 +625,7 @@ src/
 ```bash
 npm ci
 npm run typecheck:all   # CLI + service TypeScript validation
-npm test                # Vitest suite (281 tests, ~2s)
+npm test                # Vitest suite (284 tests, ~2s)
 npm run test:coverage   # Coverage + enforce the floor (stmt 88, branch 82, func 92, line 88)
 npm run service:dev     # Run the HTTP service locally with hot reload
 npx tsx src/cli/index.ts ./fixtures/bad   # Test against bad config
@@ -651,7 +650,7 @@ cates-analyzer rules --format json     # full machine-readable catalog
 cates-analyzer explain SEC003          # full detail + remediation for one rule
 ```
 
-Use the [`⚙️ Configuring CATES`](#%EF%B8%8F-configuring-cates) section to
+Use the [`Configuring CATES`](#configuring-cates) section to
 turn any rule on/off or override its severity in `.cates.yml`.
 
 > **Legend:** Severity follows CATES §9. **Autofix ✅** means

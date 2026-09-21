@@ -2,9 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": ".",
-    "outDir": "./dist-service",
-    "noUnusedLocals": false,
-    "noUnusedParameters": false
+    "outDir": "./dist-service"
   },
   "include": ["src/**/*.ts", "service/**/*.ts"],
   "exclude": ["node_modules", "dist", "dist-service", "tests", "fixtures", "service/web"]

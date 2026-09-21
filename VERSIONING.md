@@ -92,6 +92,11 @@ workflow exits successfully without creating or updating a Release PR.
 5. The same tag publishes multi-architecture container images to
    `ghcr.io/microsoft/cates` with provenance and an SBOM.
 
+For npm, configure `npm-publish.yml` as a trusted publisher for the
+`npm-publish` environment after the package is bootstrapped. Trusted publishing
+uses the workflow's OIDC identity instead of a long-lived write token. An
+`NPM_TOKEN` may be used only for the initial publish, then removed.
+
 ---
 
 ## Tagging conventions

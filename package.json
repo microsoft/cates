@@ -7,7 +7,6 @@
     "cates-analyzer": "dist/cli/index.js",
     "cates-optimize": "dist/optimizer/cli.js"
   },
-  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "repository": {
     "type": "git",
@@ -24,8 +23,8 @@
   },
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "files": [
@@ -78,17 +77,20 @@
     "helmet": "^8.3.0",
     "js-tiktoken": "^1.0.18",
     "ora": "^9.4.1",
-    "yaml": "^2.9.0",
-    "zod": "^4.5.4"
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "@types/node": "^22.20.1",
+    "@types/node": "^22.20.2",
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^5.0.0",
     "supertest": "^7.2.2",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }

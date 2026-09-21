@@ -99,7 +99,12 @@ const HARNESS_CHECKS = [
   {
     id: 'output-constraints',
     label: 'Output format constraints',
-    patterns: [/respond.*(?:format|json|markdown)/i, /output.*(?:must|should)/i, /do not.*(?:explain|comment)/i],
+    patterns: [
+      /respond.*(?:format|json|markdown)/i,
+      /output.*(?:must|should)/i,
+      /(?:^|\n)\s*#{1,6}\s+output\b/i,
+      /do not.*(?:explain|comment)/i,
+    ],
     severity: 'low' as const,
   },
   {

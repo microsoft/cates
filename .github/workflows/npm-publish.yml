@@ -1,9 +1,9 @@
 name: npm-publish
 
 # Fires when release-please creates a tag (e.g. `cates-analyzer-v1.2.0`) or
-# any `v*` tag manually pushed. Requires the `NPM_TOKEN` repo secret with
-# publish permission on the `cates-analyzer` package. Publishes with
-# --provenance so the resulting tarball is signed and verifiable on npm.
+# any `v*` tag manually pushed. Prefer npm trusted publishing (OIDC); the
+# `NPM_TOKEN` secret remains an optional bootstrap fallback for the first
+# publish. Provenance makes the resulting tarball signed and verifiable.
 on:
   push:
     tags:
@@ -11,14 +11,20 @@ on:
       - 'cates-analyzer-v*'
   workflow_dispatch:
 
-permissions:
-  contents: read
-  id-token: write   # required for npm provenance (Sigstore)
+permissions: read-all
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write   # required for npm provenance (Sigstore)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -26,7 +32,6 @@ jobs:
         with:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
-          cache: npm
 
       - run: npm ci
 
@@ -49,4 +54,6 @@ jobs:
       - name: Publish to npm with provenance
         run: npm publish --provenance --access public
         env:
+          # npm uses OIDC first when a trusted publisher is configured, then
+          # falls back to this token for initial package bootstrapping.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
