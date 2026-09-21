@@ -5,7 +5,7 @@
 mode: cronjob
 
 image:
-  repository: cates-analyzer
+  repository: ghcr.io/microsoft/cates
   tag: ""              # defaults to .Chart.AppVersion when empty
   pullPolicy: IfNotPresent
   pullSecrets: []      # [{ name: ghcr-creds }]

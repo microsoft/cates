@@ -24,11 +24,11 @@ cates-analyzer .
 npm install --save-dev cates-analyzer
 npx cates-analyzer .
 
-# 4) Run it in Docker (no Node.js required locally)
-docker run --rm -v "$PWD:/work" cates-analyzer:latest .
+# 4) Run the published image (no Node.js required locally)
+docker run --rm -v "$PWD:/work" ghcr.io/microsoft/cates:latest .
 ```
 
-Requires Node.js **>= 20** for the npm install paths. The Docker image
+Requires Node.js **>= 22.12** for the npm install paths. The Docker image
 ships its own runtime plus `git` and `gh`.
 
 The package installs two commands: **`cates-analyzer`** (reports inefficiencies)
@@ -89,6 +89,9 @@ toolchain across Windows, macOS, and Linux (plus the right `git` and `gh`
 versions baked in).
 
 ```bash
+# Pull the latest published image
+docker pull ghcr.io/microsoft/cates:latest
+
 # Build locally
 docker build -t cates-analyzer .
 
@@ -120,7 +123,6 @@ ConfigMap-mounted `.cates.yml` policy.
 ```bash
 helm install cates ./deploy/helm/cates \
   -n cates --create-namespace \
-  --set image.tag=1.0.0 \
   --set githubToken.value=$GH_TOKEN \
   --set-json 'args=["demo","--limit","25","--format","json"]'
 ```
@@ -193,8 +195,8 @@ Every toggle and policy field from
 ### Running the service locally
 
 ```bash
-# Build and run (Node 20+)
-npm install
+# Build and run (Node 22.12+)
+npm ci
 npm run build:service
 npm run service:start         # listens on :8080
 
@@ -211,8 +213,8 @@ launch the service:
 
 ```bash
 docker build -t cates .
-docker run --rm -p 8080:8080 cates \
-  node /app/dist-service/service/server.js
+docker run --rm -p 8080:8080 --entrypoint node cates \
+  /app/dist-service/service/server.js
 ```
 
 ### Rule &amp; dimension toggles in the UI
@@ -246,7 +248,7 @@ score updates immediately and the result includes `disabledRuleIds` /
 | Capability | What you get |
 |---|---|
 | **Zero-LLM static analysis** | Deterministic, fast, no API keys, no data exfiltration |
-| **49 rules** across 6 dimensions | Token efficiency, security, specificity, completeness, conflict/reachability, harness quality |
+| **49 stable rules** across 6 scored dimensions, plus 10 experimental rules | Token efficiency, security, specificity, completeness, conflict/reachability, harness quality, cache shaping, and output shaping |
 | **Per-family tokenizers** | Model-family tokenizers or an offline approximation — pick one or compare side-by-side |
 | **Multi-surface discovery** | Repository + path-specific instructions, prompt libraries, chat modes, MCP configs, hooks, setup steps, editor settings |
 | **Configurable** | Toggle any rule or whole dimension on/off, override severities, suppress with reasons + expirations |
@@ -622,25 +624,27 @@ src/
 ## 🧪 Development
 
 ```bash
-npm install
+npm ci
 npm run typecheck:all   # CLI + service TypeScript validation
-npm test                # Vitest suite (221 tests, ~2s)
-npm run test:coverage   # Coverage + enforce the floor (stmt 88, branch 85, func 92, line 88)
+npm test                # Vitest suite (281 tests, ~2s)
+npm run test:coverage   # Coverage + enforce the floor (stmt 88, branch 82, func 92, line 88)
 npm run service:dev     # Run the HTTP service locally with hot reload
 npx tsx src/cli/index.ts ./fixtures/bad   # Test against bad config
 npx tsx src/cli/index.ts ./fixtures/good  # Test against good config
+npm run release:check   # Full release validation + package preview
 ```
 
 CI runs `npm run test:coverage`, so any PR that drops below the configured
 coverage thresholds (set in `vitest.config.ts`) will fail. The floor is
-intentionally a few points below the achieved coverage (~91 / 88 / 97 / 91)
+intentionally below the achieved coverage (~93 / 85 / 96 / 94)
 so normal refactors don't trigger flakes; raise it when you legitimately
 improve coverage, never silently lower it.
 
 ## 📋 Complete Rule Reference
 
-All **49 rules** in the analyzer's catalog, grouped by dimension and sorted
-by severity. The same data is available programmatically:
+The analyzer catalog contains **49 stable rules** grouped by scored dimension
+and **10 opt-in experimental rules** for cache and output shaping. The same
+data is available programmatically:
 
 ```bash
 cates-analyzer rules --format json     # full machine-readable catalog

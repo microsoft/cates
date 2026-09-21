@@ -12,9 +12,17 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
     steps:
-      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+      - name: Run release-please
+        if: env.RELEASE_PLEASE_TOKEN != ''
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           # Uses release-please-config.json and .release-please-manifest.json
           # at the repository root.
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ env.RELEASE_PLEASE_TOKEN }}
+
+      - name: Report disabled release automation
+        if: env.RELEASE_PLEASE_TOKEN == ''
+        run: echo "::notice::Set RELEASE_PLEASE_TOKEN to enable release PR automation under the repository branch ruleset."

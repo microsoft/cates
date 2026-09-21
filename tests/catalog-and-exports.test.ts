@@ -1,7 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { RULE_CATALOG, getRule, rulesAsJson, stableRules, experimentalRules } from '../src/rules/catalog.js';
+import { ANALYZER_VERSION } from '../src/version.js';
 import * as lib from '../src/index.js';
 
 describe('rules/catalog', () => {
@@ -51,6 +53,13 @@ describe('rules/catalog', () => {
 });
 
 describe('library entry point (src/index.ts)', () => {
+  it('keeps the runtime version synchronized with package.json', () => {
+    const packageJson = JSON.parse(
+      readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+    ) as { version: string };
+    expect(ANALYZER_VERSION).toBe(packageJson.version);
+  });
+
   it('re-exports the documented public surface', () => {
     expect(typeof lib.analyze).toBe('function');
     expect(typeof lib.analyzeInMemory).toBe('function');
@@ -58,6 +67,7 @@ describe('library entry point (src/index.ts)', () => {
     expect(typeof lib.evaluateConformance).toBe('function');
     expect(typeof lib.evaluateGates).toBe('function');
     expect(typeof lib.getRule).toBe('function');
+    expect(lib.ANALYZER_VERSION).toBe(ANALYZER_VERSION);
     expect(Array.isArray(lib.RULE_CATALOG)).toBe(true);
   });
 });

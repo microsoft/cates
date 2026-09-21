@@ -2,16 +2,16 @@
 #
 # Multi-stage build for cates-analyzer
 #
-# Base: node:20-alpine
+# Base: node:24-alpine
 #   - Small (~50 MB), regularly patched, official Node image.
 #   - Pure-JS deps so musl libc is fine.
 #   - distroless was considered but rejected: cates shells out to `git`
 #     and `gh` to clone repos for review, which distroless can't host.
 #
 # Pin the base via build arg so consumers can lock to a digest:
-#   docker build --build-arg NODE_IMAGE=node:20.18-alpine3.20@sha256:... .
+#   docker build --build-arg NODE_IMAGE=node:24-alpine@sha256:... .
 
-ARG NODE_IMAGE=node:20-alpine
+ARG NODE_IMAGE=node:24-alpine
 
 # ---------- deps stage: install full deps + build TS ----------
 FROM ${NODE_IMAGE} AS build
@@ -41,7 +41,10 @@ FROM ${NODE_IMAGE} AS runtime
 #   github-cli - preferred clone path when available
 #   ca-certs   - HTTPS to github.com
 #   tini       - PID 1 to reap zombies (matters in k8s Jobs)
-RUN apk add --no-cache git github-cli ca-certificates tini \
+RUN apk upgrade --no-cache \
+ && apk add --no-cache git github-cli ca-certificates tini \
+ && rm -rf /usr/local/lib/node_modules/npm \
+ && rm -f /usr/local/bin/npm /usr/local/bin/npx \
  && addgroup -S cates && adduser -S -G cates -h /home/cates cates \
  && mkdir -p /work /home/cates/.config/gh \
  && chown -R cates:cates /work /home/cates
@@ -61,8 +64,9 @@ COPY --chown=cates:cates docs /app/docs
 #
 # This image supports two roles:
 #   1. CLI  (default ENTRYPOINT):  docker run --rm -v "$PWD:/work" cates .
-#   2. SERVICE (override CMD):     docker run -p 8080:8080 cates \
-#                                    node /app/dist-service/service/server.js
+#   2. SERVICE (override ENTRYPOINT):
+#      docker run -p 8080:8080 --entrypoint node cates \
+#        /app/dist-service/service/server.js
 USER cates
 WORKDIR /work
 
@@ -77,5 +81,5 @@ CMD ["--help"]
 # OCI labels for traceability.
 LABEL org.opencontainers.image.title="cates-analyzer" \
       org.opencontainers.image.description="Analyze coding agent configurations for token efficiency, security, and CATES conformance" \
-      org.opencontainers.image.source="" \
+      org.opencontainers.image.source="https://github.com/microsoft/cates" \
       org.opencontainers.image.licenses="MIT"

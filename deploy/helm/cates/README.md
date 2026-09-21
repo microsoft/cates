@@ -8,10 +8,13 @@ as a one-shot Job or a scheduled CronJob.
 ```bash
 helm install cates ./deploy/helm/cates \
   --namespace cates --create-namespace \
-  --set image.tag=1.0.0 \
   --set githubToken.value=ghp_xxx \
   --set-json 'args=["demo","--limit","10","--format","json"]'
 ```
+
+When `image.tag` is omitted, the chart uses its `appVersion`, which is kept
+in sync with `package.json` by release-please. The default repository is
+`ghcr.io/microsoft/cates`.
 
 ## Common patterns
 
