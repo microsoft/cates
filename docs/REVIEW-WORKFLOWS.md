@@ -12,6 +12,9 @@ The core design principle is separation of concerns:
 
 ## Recommended commands
 
+For the complete pictured walkthrough, start with the
+[illustrated user guide](USER-GUIDE.md#choose-the-input).
+
 If you are running from the source checkout before the package is installed globally or published, use:
 
 ```bash
@@ -62,7 +65,9 @@ The tool clones the repository, checks out the requested ref, and analyzes the l
 cates-analyzer review https://github.com/OWNER/REPO/blob/main/.github/copilot-instructions.md
 ```
 
-The tool analyzes the file's containing folder.
+The tool selects the exact file and retains its canonical repository-relative
+path. Siblings are not implicitly included. The report describes the selected
+scope; it is not an assessment of the rest of the repository.
 
 ### Pull request URL
 
@@ -71,6 +76,7 @@ cates-analyzer review https://github.com/OWNER/REPO/pull/123 --require-level 2
 ```
 
 For private pull requests, authenticate with `gh auth login` first.
+This checks the PR checkout's configuration, not only files changed by the PR.
 
 ## Better private repo patterns
 
