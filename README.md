@@ -4,6 +4,20 @@
 
 This is the reference implementation for the **Coding Agent Token Economics Standard (CATES)**. It is vendor-neutral and analyzes common coding-agent configuration surfaces, including repository and path-specific instructions, prompt libraries, chat modes, MCP configs, setup steps, hooks, and editor settings.
 
+The **initial scan remains a static configuration assessment**, not a bill or
+proof of economic performance. For end-to-end costs and accepted-task outcomes,
+use the separate, opt-in [experimental economics assessment](#experimental-end-to-end-token-economics).
+
+For deeper **GitHub Copilot hygiene**, run `cates-analyzer . --copilot`.
+The [Copilot profile](docs/COPILOT-HYGIENE.md) adds 15 experimental checks across
+11 configuration families, explicit coverage limits, and a manual-verification
+checklist. It is available in the CLI, library, API and hosted UI without
+changing the stable scoring model or gates.
+
+**OpenSSF Best Practices status: not registered; no badge claimed.**
+See the [maintainer setup and assurance runbook](docs/MAINTAINER-SETUP.md) for
+branch-protection activation, release bootstrap, and the managed-fuzzing decision.
+
 ---
 
 ## 🚀 Quick Start
@@ -151,7 +165,8 @@ as the score is returned.
 | --- | --- | --- |
 | `POST` | `/api/analyze` | In-memory analysis. Body: `{ files: [{path, content}], policy?, tokenizer? }`. |
 | `POST` | `/api/scan` | GitHub-URL analysis. Body: `{ url, policy?, tokenizer? }`. |
-| `GET`  | `/api/rules` | Full `RULE_CATALOG` plus service limits, for UIs and tooling. |
+| `POST` | `/api/economics` | Experimental, separate accounting over a normalized usage ledger; no scan or score. |
+| `GET`  | `/api/rules` | Stable/cache-output `rules`, separate `copilotChecks`, and service limits. |
 | `GET`  | `/api/healthz` | Liveness probe. |
 | `GET`  | `/api/readyz` | Readiness probe. |
 
@@ -159,6 +174,11 @@ All endpoints accept and return JSON. The `AnalysisResult` shape returned
 by the analyze and scan endpoints is **the same** type the CLI emits with
 `--format json` — every existing report consumer (dashboard, CI gates,
 SARIF converter) works unchanged.
+
+`/api/economics` instead returns an experimental `EconomicsReport`. It accepts
+caller-supplied records only; it does not collect telemetry, import invoices,
+or fetch prices. Economics remains separate from the hosted scan/paste UI;
+the UI's Copilot hygiene selector adds static advice, not usage accounting.
 
 ### Service limits (per request)
 
@@ -174,9 +194,11 @@ display them or pre-validate.
 
 ### Configuration parity
 
-Every toggle and policy field from
-[`Configuring CATES`](#configuring-cates) is accepted in the
-`policy` field of the request body:
+Rule/dimension overrides, suppressions, `experimental`, and `copilot` are
+accepted in the request's `policy` field. HTTP overrides use the long object
+form, not YAML shorthand. Threshold fields are accepted for shared-policy
+compatibility, but HTTP endpoints return analysis reports rather than enforcing
+CLI exit-code gates; callers can evaluate those reports with `evaluateGates`.
 
 ```json
 {
@@ -184,11 +206,17 @@ Every toggle and policy field from
     { "path": ".github/copilot-instructions.md", "content": "..." }
   ],
   "policy": {
+    "copilot": "all",
     "dimensions": { "security": { "enabled": false } },
     "rules": { "TE004": { "severity": "low" } }
   }
 }
 ```
+
+File URLs analyze the requested file; folder URLs preserve repository-relative
+classification while restricting traversal. Resource-limited, unreadable and
+unrecognized inputs are not evidence of a clean repository. See the
+[coverage contract and resource limits](docs/COPILOT-HYGIENE.md#honest-boundaries-and-resource-limits).
 
 ### Running the service locally
 
@@ -258,7 +286,8 @@ score updates immediately and the result includes `disabledRuleIds` /
 | **Portfolio scanning** | Roll up many repos into one report |
 | **Demo mode** | Scan repositories supplied through a custom manifest |
 | **Safe autofix** | `--fix` / `--fix-dry-run` for mechanical, reviewable changes |
-| **Token economics** | Per-finding token impact + conservative and projected savings estimates |
+| **Static economics signals** | Per-finding heuristic impact and legacy savings estimates; not measured spend or proven reductions |
+| **Experimental lifecycle accounting** | Separate usage-ledger assessment: cache/input/output, retries and child calls, explicit rates, non-model costs, and cost per accepted task |
 | **Hardened runtime** | Sandboxed reads, argv-injection guards, size/depth limits, binary detection, no network calls in analyze mode |
 | **Multiple ship targets** | npm CLI, Docker image, Helm chart, and local HTTP service |
 
@@ -454,8 +483,8 @@ manual opportunities.
 
 ## 🧪 Experimental: cache & output shaping
 
-Input is the *cheapest* token class. Two higher-leverage axes are detectable
-statically and shipped as **experimental, non-normative** rules — **cache-shaping**
+Beyond configuration size, two possible economic improvement areas are assessed
+statically through **experimental, non-normative** rules — **cache-shaping**
 (`CS001`–`CS005`: volatile tokens in the always-loaded prefix, dynamic-before-static
 ordering, …) and **output-shaping** (`OS001`–`OS005`: missing output contract,
 full-file-rewrite mandates, unconditional verbose reasoning, …).
@@ -484,7 +513,40 @@ rules:
 Findings live in a separate `result.experimental` channel with
 `"stability": "experimental"` and are **SemVer-exempt**. See
 [`docs/EXPERIMENTAL-CACHE-OUTPUT-DIMENSIONS.md`](docs/EXPERIMENTAL-CACHE-OUTPUT-DIMENSIONS.md)
-and `CATES-v1.0.md` §5.4 / §9.9 / §9.10. This is **not part of the standard yet**.
+and `CATES-v1.0.md` §5.4 / §9.9 / §9.10. These are informative parts of the
+working draft, **not normative conformance requirements**. Static signals do
+not establish cache hits, universal price ratios, or behavior-preserving savings.
+
+## Experimental end-to-end token economics
+
+**Annex L** expands CATES beyond configuration hygiene while leaving the
+initial scan, its 49 stable rules, six scored dimensions, and CI gates intact.
+Invoke the separate accounting mode only when you have usage/outcome records:
+
+```bash
+# Synthetic worked example, not real vendor pricing
+node dist/cli/index.js economics examples/economics.json
+node dist/cli/index.js economics examples/economics.json --format json
+# Installed command: cates-analyzer economics usage.json
+```
+
+The experimental assessment accounts for **uncached input, cache reads/writes,
+output including reasoning, retries, failed/cancelled work, child-agent calls,
+retrieval and compaction calls**, and separately supplied tool, compute, storage,
+network, human-review, and adjustment costs. It reports cost/tokens per
+**accepted task**, provider/model and purpose attribution, and elapsed latency.
+
+It prevents double counting, retains rate provenance, distinguishes reported
+charges from estimates, and keeps missing data **unknown rather than zero**.
+There are no hardcoded vendor prices, model calls, telemetry collectors, or
+economic gates. Complete coverage is caller-declared, not independently audited;
+empirical optimization benefits remain unproven until evaluated.
+
+See the [full economics contract and lifecycle coverage matrix](docs/TOKEN-ECONOMICS.md)
+for every field, accounting equation, provider-normalization boundary, worked
+example, limitation, and evidence/graduation requirement. The same assessment
+is available as `analyzeEconomics(input)` and `POST /api/economics`; no runtime
+economics UI or automatic provider adapters are included.
 
 ## 📊 What It Scores
 

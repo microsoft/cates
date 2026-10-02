@@ -12,9 +12,9 @@ export interface RuleConfigInput {
   dimensions?: Partial<Record<Dimension, RuleConfigEntry>>;
 }
 
-export interface RuleConfigResult {
-  findings: Finding[];
-  disabledFindings: Finding[];
+export interface RuleConfigResult<T extends Finding = Finding> {
+  findings: T[];
+  disabledFindings: T[];
   disabledRuleIds: string[];
   disabledDimensions: Dimension[];
 }
@@ -29,7 +29,7 @@ export interface RuleConfigResult {
  * Disabled findings are returned separately so callers can still report what
  * was filtered (and why) without scoring against them.
  */
-export function applyRuleConfig(findings: Finding[], config: RuleConfigInput): RuleConfigResult {
+export function applyRuleConfig<T extends Finding>(findings: T[], config: RuleConfigInput): RuleConfigResult<T> {
   const rules = normalizeKeys(config.rules);
   const dimensions = config.dimensions ?? {};
 
@@ -43,8 +43,8 @@ export function applyRuleConfig(findings: Finding[], config: RuleConfigInput): R
     if (entry?.enabled === false) disabledDimensions.add(dim);
   }
 
-  const kept: Finding[] = [];
-  const dropped: Finding[] = [];
+  const kept: T[] = [];
+  const dropped: T[] = [];
 
   for (const finding of findings) {
     const ruleId = finding.ruleId.toUpperCase();

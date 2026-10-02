@@ -22,6 +22,7 @@
       font-family: ui-sans-serif, system-ui, sans-serif;
     }
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
     body { margin: 0; background: var(--bg); color: var(--text); }
     main { max-width: 1180px; margin: 0 auto; padding: 24px 20px 56px; }
     h1 { font-size: 32px; margin: 0 0 6px; }
@@ -49,6 +50,11 @@
     textarea { min-height: 280px; font-family: ui-monospace, monospace; resize: vertical; }
     .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
     .row > label.field { flex: 1 1 220px; }
+    .row > * { min-width: 0; }
+    button, select { min-height: 44px; }
+    button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, summary:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: 3px;
+    }
     button.primary {
       background: var(--accent); color: #001425; border: 0; padding: 10px 18px;
       border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 14px;
@@ -76,8 +82,15 @@
     th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; font-size: 13px; }
     th { background: #0f172a; color: var(--muted); font-weight: 600; }
     tr:last-child td { border-bottom: 0; }
+    .table-scroll { overflow-x: auto; max-width: 100%; }
+    td, .finding-card, .hint, .drawer summary { overflow-wrap: anywhere; }
+    .finding-card { padding: 14px; border: 1px solid var(--border); border-radius: 10px; margin: 10px 0; }
+    .finding-card p { margin: 8px 0 0; line-height: 1.5; }
+    .finding-card header { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .scope-note { padding: 12px 14px; border-left: 3px solid var(--warn); background: var(--panel); line-height: 1.5; }
+    .profile-description { margin-bottom: 0; }
 
-    .pill { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .pill { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
     .sev-critical { background: #7f1d1d; color: #fecaca; }
     .sev-high { background: #7c2d12; color: #fed7aa; }
     .sev-medium { background: #713f12; color: #fef3c7; }
@@ -88,6 +101,7 @@
     .error { background: #450a0a; border: 1px solid var(--bad); color: #fecaca; padding: 12px 14px; border-radius: 10px; margin-bottom: 12px; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; }
 
     details { background: var(--panel-2); border-radius: 10px; padding: 8px 12px; margin-top: 6px; }
+    details:not([open]) > :not(summary) { display: none; }
     details summary { cursor: pointer; font-size: 13px; color: var(--accent-2); }
     details pre { background: #020617; padding: 10px; border-radius: 8px; overflow: auto; font-size: 12px; }
 
@@ -107,12 +121,20 @@
     .rule-group { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
     .rule-group h3 { margin: 0 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
     .rule-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 12px; }
-    .rule-grid label { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; padding: 2px 0; }
+    .rule-grid label { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; padding: 2px 0; min-height: 44px; }
     .rule-grid label.disabled { color: var(--muted); text-decoration: line-through; }
     .rule-grid input { accent-color: var(--accent); }
     .drawer-actions { display: flex; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); flex-wrap: wrap; }
     .yaml-preview { margin-top: 12px; }
     .yaml-preview pre { background: #020617; padding: 10px 12px; border-radius: 8px; font-size: 12px; max-height: 220px; overflow: auto; }
+    @media (max-width: 600px) {
+      main { padding: 20px 14px 40px; }
+      .panel { padding: 14px; }
+      .findings-table thead { display: none; }
+      .findings-table tr { display: grid; grid-template-columns: 1fr auto; padding: 8px 0; border-bottom: 1px solid var(--border); }
+      .findings-table td { border: 0; padding: 6px 12px; }
+      .findings-table td:nth-child(n+3) { grid-column: 1 / -1; }
+    }
   </style>
 </head>
 <body>
@@ -129,14 +151,28 @@
     <button data-mode="scan" type="button">Scan a repo</button>
   </div>
 
+  <section class="panel" aria-label="Analysis profile">
+    <label class="field">
+      <span>Copilot hygiene profile</span>
+      <select id="copilot-target" aria-describedby="profile-description">
+        <option value="">Off — stable CATES scan only</option>
+        <option value="all">All Copilot targets — experimental advisory checks</option>
+        <option value="cli">Copilot CLI</option>
+        <option value="cloud-agent">Copilot cloud agent</option>
+        <option value="code-review">Copilot code review</option>
+        <option value="vscode">Copilot in VS Code</option>
+      </select>
+    </label>
+    <p class="hint profile-description" id="profile-description">Adds configuration hygiene and coverage notes without changing your stable score. Organization policies and runtime behavior still need verification.</p>
+  </section>
+
   <details class="drawer" id="toggle-drawer">
     <summary>Rule &amp; dimension toggles · export as <code>.cates.yml</code></summary>
     <div class="drawer-body">
       <p class="hint" style="margin-top:0;">
-        Disable rules or whole dimensions to fit your policy
-        (e.g. <em>turn off all security rules if another scanner owns those checks</em>). The
-        toggle state is sent with every request and surfaces in the result as
-        <code>disabledFindings</code>.
+        Tailor individual rules or whole dimensions to your policy.
+        Disabled findings remain visible in the report as <code>disabledFindings</code>.
+        Copilot hygiene checks remain advisory.
       </p>
       <div class="toggle-bar" id="dim-bar"></div>
       <div id="rule-groups"></div>
@@ -160,9 +196,18 @@
           <option value="CLAUDE.md">CLAUDE.md (Claude project memory)</option>
           <option value="GEMINI.md">GEMINI.md (Gemini project memory)</option>
           <option value=".ai/instructions.md">.ai/instructions.md (generic AI rules)</option>
-          <option value=".github/prompts/prompt.md">Prompt file (.github/prompts/*.md)</option>
+          <option value=".github/prompts/review.prompt.md">Copilot prompt (.github/prompts/*.prompt.md)</option>
+          <option value=".github/instructions/api.instructions.md" data-copilot>Path-specific instructions</option>
+          <option value=".github/agents/reviewer.agent.md" data-copilot>Custom agent</option>
+          <option value=".github/skills/review/SKILL.md" data-copilot>Skill (name: review)</option>
+          <option value=".github/hooks/guardrails.json" data-copilot>Repository hooks</option>
+          <option value=".github/copilot/settings.json" data-copilot>Shared Copilot CLI settings</option>
+          <option value=".vscode/settings.json" data-copilot>VS Code settings (JSONC)</option>
           <option value=".mcp.json">MCP config (.mcp.json)</option>
-          <option value=".github/copilot-setup-steps.yml">Setup steps (.github/copilot-setup-steps.yml)</option>
+          <option value=".github/lsp.json" data-copilot>LSP servers</option>
+          <option value=".github/workflows/copilot-setup-steps.yml" data-copilot>Cloud agent setup workflow</option>
+          <option value=".github/workflows/copilot-code-review.yml" data-copilot>Code-review setup workflow</option>
+          <option value="plugin.json" data-copilot>Plugin manifest</option>
           <option value=".cursorrules">.cursorrules</option>
           <option value=".windsurfrules">.windsurfrules</option>
         </select>
@@ -192,7 +237,8 @@
   </section>
 
   <section id="result" hidden>
-    <h2>Score</h2>
+    <h2>Stable CATES score</h2>
+    <p class="scope-note" id="r-discovery-warning" hidden></p>
     <div class="grid">
       <div class="card"><div class="label">Overall</div><div class="value" id="r-score"></div><div class="sub" id="r-grade"></div></div>
       <div class="card"><div class="label">Findings</div><div class="value" id="r-findings"></div><div class="sub" id="r-critical"></div></div>
@@ -201,16 +247,34 @@
     </div>
 
     <h2>Dimensions</h2>
-    <table>
+    <div class="table-scroll"><table>
       <thead><tr><th>Dimension</th><th>Score</th><th>Weight</th><th>Summary</th></tr></thead>
       <tbody id="r-dimensions"></tbody>
-    </table>
+    </table></div>
 
-    <h2>Findings</h2>
-    <table>
+    <section id="r-copilot" hidden aria-labelledby="copilot-heading">
+      <h2 id="copilot-heading">Copilot hygiene · experimental</h2>
+      <p class="scope-note" id="r-copilot-summary"></p>
+      <details>
+        <summary>Surface coverage and scan boundaries</summary>
+        <p class="hint">Not detected does not mean missing or broken. Optional integrations are not required.</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Surface</th><th>Candidates</th><th>Checked</th></tr></thead>
+          <tbody id="r-copilot-coverage"></tbody>
+        </table></div>
+        <div id="r-copilot-diagnostics"></div>
+        <div id="r-copilot-unchecked"></div>
+      </details>
+      <div id="r-copilot-findings"></div>
+      <h3>Verification outside this scan</h3>
+      <div id="r-copilot-manual"></div>
+    </section>
+
+    <h2>Stable-rule findings</h2>
+    <div class="table-scroll"><table class="findings-table">
       <thead><tr><th>Rule</th><th>Severity</th><th>File</th><th>Message &amp; suggestion</th></tr></thead>
       <tbody id="r-finding-rows"></tbody>
-    </table>
+    </table></div>
   </section>
 
   <section id="error-box" class="error" hidden></section>

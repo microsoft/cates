@@ -5,6 +5,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import helmet from 'helmet';
 import {
   handleAnalyze,
+  handleEconomics,
   handleHealthz,
   handleReadyz,
   handleRules,
@@ -70,6 +71,7 @@ export function createServer(): express.Express {
 
   // ─── API ──────────────────────────────────────────────────────────────────
   app.post('/api/analyze', wrapAsync(req => handleAnalyze(req.body)));
+  app.post('/api/economics', wrapAsync(req => handleEconomics(req.body)));
   app.post('/api/scan', scanConcurrencyLimiter(MAX_CONCURRENT_SCANS), wrapAsync(req => handleScan(req.body)));
   app.get('/api/rules', wrap(() => handleRules()));
   app.get('/api/healthz', wrap(() => handleHealthz()));

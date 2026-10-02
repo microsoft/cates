@@ -19,6 +19,17 @@ Releases are automated via
 
 ### Features
 
+* **copilot (experimental):** add an integrated, opt-in hygiene profile with 15
+  checks across 11 configuration families. Wire CLI/review, library, policy,
+  HTTP, catalogs, pretty/JSON/SARIF metadata and the hosted UI. Keep profile
+  findings outside stable scores/gates; expose coverage and external checks.
+* **economics (experimental):** add separate normalized-ledger accounting via
+  `cates-analyzer economics`, `analyzeEconomics`, and `POST /api/economics`.
+  Account for disjoint input/cache/output classes, reasoning subsets, all
+  attempts and child calls, explicit rate provenance, reported charges,
+  non-model costs, outcome denominators, and elapsed latency. Missing data
+  remains unknown. Default scan rules, scores, output schemas, and gates are
+  unchanged.
 * **experimental:** add opt-in, non-normative cache-shaping (`CS001`–`CS005`) and
   output-shaping (`OS001`–`OS005`) dimensions behind `--experimental` /
   `--experimental-only` / `CATES_EXPERIMENTAL=1` / `experimental: true` in
@@ -32,6 +43,11 @@ Releases are automated via
 
 ### Build System
 
+* Bind npm and container publishing to matching stable release tags and
+  lockfile versions. Use OIDC-only automatic npm publication, with an explicit
+  manual bootstrap step and tag-bound recovery workflows.
+* Add tested main-branch protection configuration for administrator activation
+  and fixed-seed input-boundary mutation coverage in normal CI.
 * Require Node.js 22.12 or newer and use Node.js 24 for release and container
   builds.
 * Upgrade stable direct dependencies, including Chalk 6, TypeScript 7, and
@@ -43,8 +59,32 @@ Releases are automated via
 * Preserve both executable entry points during npm publication and declare
   public registry and repository provenance metadata.
 
+### Bug Fixes
+
+* Parse JSONC without corrupting URLs or string contents; accept valid trailing
+  commas, inspect local settings, and parse instruction scope as YAML.
+* Preserve repository-relative classification for GitHub folder URLs and select
+  exact files for file URLs. Correct the hosted setup-workflow paste location.
+* Surface discovery omissions and bound reads/BPE work on pathological text.
+  Keep unknown token counts distinct from measured zero in the Copilot report.
+* Normalize in-memory paths, reject duplicate/unsafe inputs, enforce UTF-8 byte
+  limits, and avoid temporary-path leakage in service responses.
+* Correct setup permission advice: checkout normally needs `contents:read`, not
+  a standing write grant for the agent.
+
 ### Documentation
 
+* Document administrator/release activation, artifact acceptance, the managed
+  fuzzing risk decision, and the actual unregistered Best Practices badge status.
+* Add the Copilot hygiene usage/coverage contract, dated primary references,
+  target-specific limitations, check catalog, and graduation requirements.
+* Add CATES Annex L and the comprehensive end-to-end economics contract,
+  lifecycle coverage matrix, synthetic ledger, normalization guidance,
+  uncertainty model, and graduation protocol.
+* Clarify that stable rules and deterministic detection do not establish
+  empirical precision or economic benefit; remove unsupported universal price,
+  confidence-band, and behavior-preservation claims. Experimental static
+  messages now express uncertainty without changing detections or weights.
 * Synchronize Helm release metadata and current test and coverage figures.
 
 ## 1.2.0 (2026-06-02)

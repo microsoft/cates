@@ -38,8 +38,9 @@ const SEVERITY_DEDUCTIONS: Record<string, number> = {
 
 const EXPERIMENTAL_NOTE =
   '🧪 EXPERIMENTAL (non-normative): cache/output-shaping is OFF by default, carries ZERO scoring weight, ' +
-  'and is excluded from conformance and CI gates. Token-impact figures are advisory static estimates ' +
-  '(cached-input ≈ 0.1× input; output ≈ 2–5× input — verify per model/provider). Rule IDs are SemVer-exempt.';
+  'and is excluded from conformance and CI gates. Token-impact figures are uncalibrated static heuristics, ' +
+  'may overlap, and are not measured usage or monetary savings. Prices and outcomes require separate evidence. ' +
+  'Rule IDs are SemVer-exempt.';
 
 export function analyzeExperimental(files: ExperimentalInput[], options: AnalyzerOptions): ExperimentalReport {
   const raw: ExperimentalFinding[] = [

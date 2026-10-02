@@ -23,6 +23,8 @@ export interface ResolvedReviewSource {
   repoPath: string;
   analyzePath: string;
   displayName: string;
+  includeFiles?: string[];
+  scanSubpath?: string;
   cleanup?: () => Promise<void>;
 }
 
@@ -90,6 +92,7 @@ export function parseGitHubLink(input: string): GitHubLink | undefined {
     if (!ref) throw new Error(`GitHub ${mode} URL is missing a branch, tag, or commit ref: ${input}`);
     assertSafeGitRef(ref, input);
     const subpath = rest.slice(1).join('/');
+    if (mode === 'blob' && !subpath) throw new Error(`Invalid GitHub blob URL: missing file path in ${input}`);
     if (subpath) assertSafeSubpath(subpath, input);
     return {
       owner,
@@ -185,6 +188,8 @@ async function materializeGitHubSource(
       repoPath,
       analyzePath,
       displayName: formatGitHubDisplay(link),
+      ...(link.fileMode && link.subpath ? { includeFiles: [link.subpath] } : {}),
+      ...(!link.fileMode && link.subpath ? { scanSubpath: link.subpath } : {}),
       cleanup: options.keepWorktree ? undefined : async () => {
         await rm(tempRoot, { recursive: true, force: true });
       },

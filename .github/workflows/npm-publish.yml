@@ -1,15 +1,20 @@
 name: npm-publish
 
 # Fires when release-please creates a tag (e.g. `cates-analyzer-v1.2.0`) or
-# any `v*` tag manually pushed. Prefer npm trusted publishing (OIDC); the
-# `NPM_TOKEN` secret remains an optional bootstrap fallback for the first
-# publish. Provenance makes the resulting tarball signed and verifiable.
+# any `v*` tag manually pushed. Automatic publishes use OIDC only.
+# The first publish can explicitly select a temporary bootstrap token.
 on:
   push:
     tags:
       - 'v*'
       - 'cates-analyzer-v*'
   workflow_dispatch:
+    inputs:
+      bootstrap:
+        description: Use the temporary NPM_TOKEN for the initial publish
+        type: boolean
+        required: true
+        default: false
 
 permissions: read-all
 
@@ -27,11 +32,16 @@ jobs:
       id-token: write   # required for npm provenance (Sigstore)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify release tag and package versions
+        run: node scripts/verify-release.mjs
 
       - run: npm ci
 
@@ -51,9 +61,19 @@ jobs:
           path: cates-analyzer-sbom.cdx.json
           retention-days: 90
 
-      - name: Publish to npm with provenance
+      - name: Publish to npm with OIDC and provenance
+        if: github.event_name != 'workflow_dispatch' || !inputs.bootstrap
         run: npm publish --provenance --access public
         env:
-          # npm uses OIDC first when a trusted publisher is configured, then
-          # falls back to this token for initial package bootstrapping.
+          NODE_AUTH_TOKEN: ''
+
+      - name: Bootstrap the first npm publish
+        if: github.event_name == 'workflow_dispatch' && inputs.bootstrap
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::error::Bootstrap requires a short-lived granular NPM_TOKEN in the npm-publish environment."
+            exit 1
+          fi
+          npm publish --provenance --access public
+        env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

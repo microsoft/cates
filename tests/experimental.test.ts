@@ -155,6 +155,14 @@ describe('experimental rule overrides + report', () => {
     const base = await analyzeSmelly(false);
     expect(formatExperimental(base)).toMatch(/Experimental mode is off/);
   });
+
+  it('labels impact as an uncalibrated hypothesis, not a guaranteed economic benefit', async () => {
+    const result = await analyzeSmelly(true);
+    expect(result.experimental?.note).toMatch(/uncalibrated static heuristics/);
+    expect(result.experimental?.note).toMatch(/not measured usage or monetary savings/);
+    expect(result.experimental?.note).not.toMatch(/0\.1×|2–5×/);
+    expect(result.experimental?.findings.find(f => f.ruleId === 'CS001')?.message).toMatch(/if this value changes/);
+  });
 });
 
 describe('optimizer experimental mode', () => {

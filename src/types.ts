@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 import { z } from 'zod';
+import type { CopilotReport } from './copilot/types.js';
 
 // ─── Scoring Types ───────────────────────────────────────────────────────────
 
@@ -138,7 +139,7 @@ export interface DiscoveredFile {
   scope: ConfigScope;
   sizeBytes: number;
   tokenCount: number;
-  isActive: boolean; // false = dead/unreachable file
+  isActive: boolean; // false = excluded from core analysis, including resource-limited files
 }
 
 /**
@@ -165,6 +166,14 @@ export interface DiscoveryResult {
    * canonical tokenizer so reports can render a single table.
    */
   totalTokensByTokenizer?: Record<string, number>;
+  /** Omitted only when no traversal/read limitations were encountered. */
+  diagnostics?: DiscoveryDiagnostic[];
+}
+
+export interface DiscoveryDiagnostic {
+  path: string;
+  reason: 'max-files' | 'max-depth' | 'oversized' | 'binary' | 'symlink' | 'unreadable' | 'tokenization-limit' | 'scope-error';
+  message: string;
 }
 
 // ─── Analysis Types ──────────────────────────────────────────────────────────
@@ -188,6 +197,8 @@ export interface AnalysisResult {
    * and is excluded from conformance and CI gates.
    */
   experimental?: ExperimentalReport;
+  /** Opt-in, non-scoring Copilot hygiene. Never contributes to stable CI gates. */
+  copilot?: CopilotReport;
 }
 
 export interface Recommendation {
@@ -208,6 +219,9 @@ export interface Recommendation {
 
 // ─── Options ─────────────────────────────────────────────────────────────────
 
+export const CopilotTargetSchema = z.enum(['all', 'cli', 'cloud-agent', 'code-review', 'vscode']);
+export type CopilotTarget = z.infer<typeof CopilotTargetSchema>;
+
 export const AnalyzerOptionsSchema = z.object({
   repoPath: z.string(),
   outputFormat: z.enum(['json', 'pretty', 'sarif']).default('pretty'),
@@ -216,6 +230,8 @@ export const AnalyzerOptionsSchema = z.object({
   maxFiles: z.number().int().positive().default(50),
   maxDepth: z.number().int().nonnegative().default(5),
   includeFiles: z.array(z.string().min(1)).optional(),
+  /** Traverse a selected directory while retaining repository-relative classification. */
+  scanSubpath: z.string().min(1).optional(),
   tokenizer: z.enum(['openai-cl100k', 'openai-o200k', 'anthropic-claude', 'approx']).optional(),
   compareTokenizers: z.array(z.enum(['openai-cl100k', 'openai-o200k', 'anthropic-claude', 'approx'])).optional(),
   suppressions: z.array(z.object({
@@ -246,6 +262,7 @@ export const AnalyzerOptionsSchema = z.object({
   // Experimental (non-normative) cache/output-shaping analysis. Off by default.
   // When false, the experimental analyzers are not run at all (no wasted work).
   experimental: z.boolean().default(false),
+  copilot: CopilotTargetSchema.optional(),
 });
 
 export type AnalyzerOptions = z.infer<typeof AnalyzerOptionsSchema>;

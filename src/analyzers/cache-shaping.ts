@@ -61,8 +61,8 @@ export function detectCacheShaping(files: CacheFile[]): ExperimentalFinding[] {
         const hit = VOLATILE_PATTERNS.find(p => p.re.test(lines[i]!));
         if (hit) {
           findings.push(mk('CS001', 'high', 'high', file.relativePath, i + 1,
-            `Volatile token in always-loaded config (${hit.label}) busts the cacheable prefix on every call.`,
-            'Move volatile values out of the always-loaded prefix; supply them via tool inputs at the end of context.',
+            `Potentially volatile token in always-loaded config (${hit.label}); cache reuse may fall if this value changes between calls.`,
+            'Verify runtime volatility and cache behavior before moving changing values after the stable prefix.',
             lines[i]!.trim().slice(0, 80), countTokens(file.content), 'cached-input'));
           break; // one per file is enough signal
         }
@@ -74,7 +74,7 @@ export function detectCacheShaping(files: CacheFile[]): ExperimentalFinding[] {
       if (mask[i]) continue;
       if (LIVE_STATE_RE.test(lines[i]!)) {
         findings.push(mk('CS003', 'medium', 'medium', file.relativePath, i + 1,
-          'Non-deterministic context directive injects live/volatile state into the preamble, reducing cache reuse.',
+          'Live-state context directive may reduce prefix reuse when the injected state changes.',
           'Fetch volatile state on-demand via tools instead of embedding it in always-loaded instructions.',
           lines[i]!.trim().slice(0, 80), countTokens(file.content), 'cached-input'));
         break;
@@ -86,7 +86,7 @@ export function detectCacheShaping(files: CacheFile[]): ExperimentalFinding[] {
       if (mask[i]) continue;
       if (UNSTABLE_ORDER_RE.test(lines[i]!)) {
         findings.push(mk('CS004', 'low', 'medium', file.relativePath, i + 1,
-          'Unstable tool/context ordering directive changes the prefix between calls, defeating the cache.',
+          'Tool/context reordering may change the rendered prefix and reduce cache reuse.',
           'Keep tool and context ordering stable and deterministic across calls.',
           lines[i]!.trim().slice(0, 80), 0, 'cached-input'));
         break;

@@ -77,7 +77,8 @@ will now fail unless `.cates.yml` lowers the severity.
 
 The workflow requires a `RELEASE_PLEASE_TOKEN` Actions secret for a user that
 can update branches under the repository ruleset. Without that secret, the
-workflow exits successfully without creating or updating a Release PR.
+workflow reports that automation is disabled without creating or updating a
+Release PR. An explicit manual dispatch without the secret fails.
 
 1. Land Conventional Commits on `main`.
 2. `release-please` opens / updates a **Release PR** that bumps
@@ -94,8 +95,18 @@ workflow exits successfully without creating or updating a Release PR.
 
 For npm, configure `npm-publish.yml` as a trusted publisher for the
 `npm-publish` environment after the package is bootstrapped. Trusted publishing
-uses the workflow's OIDC identity instead of a long-lived write token. An
-`NPM_TOKEN` may be used only for the initial publish, then removed.
+uses the workflow's OIDC identity instead of a long-lived write token. Automatic
+publishes never receive `NPM_TOKEN`; it is available only to the explicitly
+selected manual `bootstrap=true` step for the initial publish, then removed
+after successful OIDC verification.
+
+Both publishing workflows require a stable release tag matching `package.json`
+and both lockfile version fields. Manual recovery runs must select that tag,
+not `main`; prerelease publishing needs a separately designed distribution
+channel and is rejected by these stable workflows. Follow
+[the maintainer runbook](docs/MAINTAINER-SETUP.md) for bootstrap, protected
+environments, trusted-publisher settings, artifact verification and remaining
+administrator actions.
 
 ---
 
@@ -128,3 +139,18 @@ conformance, or CI gates. Automation MUST NOT depend on experimental rule IDs or
 the `result.experimental` channel for gating. An experimental rule graduates to
 stable only by being assigned a non-zero weight and admitted to conformance —
 which changes default scores and therefore requires a **major** release.
+
+The separate Annex L runtime accounting surface (`economics`, `/api/economics`,
+`analyzeEconomics`, and `EconomicsReport`) is also experimental and may change
+in a minor release. Its input identifies `schemaVersion: 1`; unsupported
+versions are rejected. This schema version is independent of the CATES
+standard version, package version, and configuration conformance levels.
+It never runs implicitly in the initial scan and must not be used as a CATES
+conformance gate.
+
+The opt-in Copilot hygiene profile (`--copilot`, `result.copilot`,
+`COPILOT_CHECKS`, and `GHCP0xx` identifiers) is likewise experimental and may
+change in a minor release. It has no scored dimension or conformance level.
+Documentation snapshots and target labels are not client-version guarantees.
+Adding discovery diagnostics is additive; parser/source-selection/resource
+protection fixes are distinct from any decision to graduate advisory checks.

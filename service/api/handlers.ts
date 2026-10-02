@@ -3,7 +3,9 @@
 import { analyzeInMemory } from '../../src/analyze-in-memory.js';
 import { analyze } from '../../src/analyzers/index.js';
 import { RULE_CATALOG } from '../../src/rules/catalog.js';
+import { COPILOT_CHECKS } from '../../src/copilot/catalog.js';
 import { resolveReviewSource } from '../../src/sources.js';
+import { analyzeEconomics, EconomicsInputSchema, type EconomicsReport } from '../../src/economics/index.js';
 import {
   AnalyzeRequestSchema,
   ScanRequestSchema,
@@ -43,8 +45,14 @@ export async function handleScan(rawBody: unknown): Promise<HandlerResult<Analys
   return runScan(parsed.data);
 }
 
-export function handleRules(): HandlerResult<{ rules: typeof RULE_CATALOG; limits: typeof SERVICE_LIMITS }> {
-  return { ok: true, status: 200, body: { rules: RULE_CATALOG, limits: SERVICE_LIMITS } };
+export async function handleEconomics(rawBody: unknown): Promise<HandlerResult<EconomicsReport>> {
+  const parsed = EconomicsInputSchema.safeParse(rawBody);
+  if (!parsed.success) return badRequest('Invalid economics ledger', parsed.error.flatten());
+  return { ok: true, status: 200, body: analyzeEconomics(parsed.data) };
+}
+
+export function handleRules(): HandlerResult<{ rules: typeof RULE_CATALOG; copilotChecks: typeof COPILOT_CHECKS; limits: typeof SERVICE_LIMITS }> {
+  return { ok: true, status: 200, body: { rules: RULE_CATALOG, copilotChecks: COPILOT_CHECKS, limits: SERVICE_LIMITS } };
 }
 
 export function handleHealthz(): HandlerResult<{ status: 'ok' }> {
@@ -82,7 +90,9 @@ async function runScan(req: ScanRequest): Promise<HandlerResult<AnalysisResult>>
     cleanup = resolved.cleanup;
     const policyOptions = applyPolicy(req.policy);
     const options: Parameters<typeof analyze>[0] = {
-      repoPath: resolved.analyzePath,
+      repoPath: resolved.repoPath,
+      includeFiles: resolved.includeFiles,
+      scanSubpath: resolved.scanSubpath,
       tokenizer: req.tokenizer,
       ...policyOptions,
     };
@@ -90,7 +100,11 @@ async function runScan(req: ScanRequest): Promise<HandlerResult<AnalysisResult>>
     return {
       ok: true,
       status: 200,
-      body: { ...result, repoPath: resolved.displayName },
+      body: {
+        ...result,
+        repoPath: resolved.displayName,
+        discovery: { ...result.discovery, files: result.discovery.files.map(file => ({ ...file, path: file.relativePath })) },
+      },
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -112,6 +126,9 @@ function applyPolicy(policy: PolicyInput | undefined): Partial<AnalyzerOptions> 
   return {
     rules: policy.rules ?? {},
     dimensions: policy.dimensions ?? {},
+    suppressions: policy.suppressions ?? [],
+    experimental: policy.experimental ?? false,
+    copilot: policy.copilot,
   };
 }
 

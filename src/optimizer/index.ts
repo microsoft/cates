@@ -53,6 +53,7 @@ export async function optimize(opts: OptimizeOptions): Promise<OptimizationResul
   }
 
   const activeFiles = before.discovery.files.filter(f => f.isActive);
+  if (before.copilot) notes.push('Copilot hygiene is advisory and is not auto-fixed. The optimizer edits only core-discovery prose; re-run the Copilot profile after changes.');
   const optimizers = selectOptimizers(opts.only, opts.skip);
 
   if (activeFiles.length === 0) {

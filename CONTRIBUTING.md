@@ -41,6 +41,13 @@ Other useful scripts:
 - `npm run test:coverage` — runs the Vitest suite with coverage.
 - `npm run release:check` — runs release validation and previews the npm tarball.
 - `npm pack --dry-run` — previews the published tarball.
+- `npm test -- tests/input-boundaries.test.ts` — replays the fixed-seed parser,
+  policy, discovery, URL and report input mutations. Preserve failing cases as
+  literal regressions rather than removing them or increasing timeouts.
+
+Repository administrators and release maintainers should follow
+[the maintainer setup runbook](docs/MAINTAINER-SETUP.md). Prepared configuration
+does not imply that branch protection, public releases, or badges are active.
 
 Keep dependencies current within their supported release lines. The Node
 types stay on the oldest supported runtime major (22) to prevent accidental

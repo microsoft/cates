@@ -48,6 +48,7 @@ As AI coding assistants move to token-based and token-based context limits model
 - [Annex I: Rule Quick Reference](#annex-i-rule-quick-reference)
 - [Annex J: Glossary](#annex-j-glossary)
 - [Annex K: Changelog](#annex-k-changelog)
+- [Annex L: End-to-End Token Economics (Experimental)](#annex-l-end-to-end-token-economics-experimental--informative)
 
 ---
 
@@ -91,6 +92,20 @@ CATES is vendor-agnostic. Any AI coding assistant that consumes repository-level
 - IDE plugin implementation details
 - Vendor commercial terms
 
+These exclusions apply to the **core static conformance profile**, not to the
+full economic lifecycle. **Annex L** defines a separate, experimental extension
+for caller-supplied usage, prices, non-token costs, and task outcomes. It does not
+collect conversation content, change the initial scan, or affect scores or gates.
+
+The reference analyzer also offers a separate, opt-in **Copilot hygiene profile**
+([coverage contract](docs/COPILOT-HYGIENE.md)). Its vendor-specific configuration
+checks are experimental implementation guidance, not additional scored rules
+or a new CATES conformance level. Repository evidence must remain distinct from
+unassessed organization policy, effective runtime configuration, and actual
+economic outcomes.
+The standard distinguishes configuration conformance from economic performance:
+a high configuration score is not evidence of low cost or successful delivery.
+
 ### 1.5 Relationship to Other Frameworks
 
 | Framework | Relationship to CATES |
@@ -98,7 +113,6 @@ CATES is vendor-agnostic. Any AI coding assistant that consumes repository-level
 | **5C Prompt Contract** (arXiv:2507.07045) | CATES incorporates 5C's parsimony principle; extends it with measurement methodology and tooling conformance |
 | **TEA-UF** (IJAIS 2024) | CATES operationalizes TEA-UF's governance layer with concrete rules and CI integration |
 | **OWASP LLM Top 10** | CATES security rules complement OWASP's prompt injection and data leakage categories |
-| **
 ---
 
 ## 2. Normative References
@@ -221,10 +235,15 @@ versioning guarantees (it MAY change or be removed in a minor revision).
 
 | Level | Meaning |
 |-------|---------|
-| Certain | Deterministic detection; zero false positive risk |
-| High | Strong heuristic match; <5% false positive rate |
-| Medium | Pattern-based detection; 5-20% false positive rate |
+| Certain | The stated syntactic or numeric predicate was deterministically detected; applicability and economic benefit still require validation |
+| High | Strong heuristic match; not a calibrated probability |
+| Medium | Pattern-based detection requiring contextual review |
 | Low | Weak signal; requires human verification |
+
+Confidence labels do not establish empirical precision, recall, or savings.
+Those claims require a labeled evaluation corpus and published methodology.
+Likewise, **stable** describes a rule's compatibility/conformance status, not
+proof that its remediation improves outcomes on every model or workload.
 
 ### 4.5 Normative vs. Informative Content
 
@@ -306,42 +325,32 @@ Security controls frequently improve token efficiency. However, CATES acknowledg
 > 🧪 **Experimental.** This subsection motivates the §9.9/§9.10 experimental
 > rules and is non-normative. It does not change any measurement or score.
 
-The normative model above optimizes **input authoring** (shrinking always-loaded
-config). Under token-based billing, input is only one of three token classes, and
-not the most expensive. A fuller cost vector is:
+The normative model above primarily evaluates **input authoring**. Economic
+assessment additionally separates uncached input, cache reads, cache writes,
+and output. There is no universal price multiplier: rates depend on provider,
+model, deployment, date, modality, tier, and contract.
 
-| Token class | Relative cost | Driver visible in static config? |
-|-------------|---------------|----------------------------------|
-| Cached input | ≈ 0.1× (≈ 90% off) | Partly — **prefix stability** |
-| Uncached input | 1× (baseline) | Yes — config size/scope (the §9.2 rules) |
-| Cache write | ≈ 1.25–2× | Partly |
-| Output | ≈ 2–5× | Partly — output **contract** |
+| Component | Static visibility | Evidence needed for economic accounting |
+|-----------|-------------------|-----------------------------------------|
+| Uncached input | File size and scope are partial proxies | Actual request usage and applicable rate |
+| Cache reads and writes | Prefix organization is a heuristic | Provider cache counters, eligibility, TTL, and rates |
+| Output, including reasoning where billed as output | Output directives are a heuristic | Output usage; reasoning breakdown if available |
+| Tools, retrieval, execution, storage, and review | Config may identify dependencies | Metered charges or explicit allocation assumptions |
+| Accepted task outcomes | Not established by a scan | Defined acceptance criteria and evaluation evidence |
 
-*(Illustrative ratios — Claude-family, 2026; the structural ordering
-`output ≫ uncached-input ≫ cached-input` is stable across vendors, but verify
-exact multipliers per model/provider before quoting them.)*
-
-Two orthogonal, statically-detectable axes follow:
-
-- **Prefix stability (cache).** A request hits the prompt cache only when its
-  leading tokens are byte-identical to a prior request. Volatile tokens (dates,
-  UUIDs, SHAs) or variable-before-static ordering in the always-loaded prefix
-  bust the cache every call. See §9.9.
-- **Output contract.** Because output is the priciest class, config that fails to
-  bound output — or mandates full-file rewrites, unconditional verbose reasoning,
-  or echoing — provably inflates the most expensive tokens. See §9.10.
-
-Both axes can be improved **without changing any instruction's meaning**, so
-functionality is preserved by construction. Actual cache-hit %, output:input
-ratio, and reasoning-token share are **runtime** signals outside CATES's
-static scope (§11) and are deferred to a future Informative annex on
-Token-Economics Telemetry.
+Stable rendered prefixes can enable cache reuse, but static dates or hashes do
+not prove that a value changes between calls. Prefix placement alone cannot
+establish cache eligibility, routing, retention, hits, or a billing discount.
+Output constraints may reduce generation, or may induce truncation and retries.
+Neither intervention is behavior-preserving by construction; evaluate it on
+representative tasks before claiming savings. See §9.9/§9.10 for heuristic
+signals and **Annex L** for the separate runtime accounting contract.
 
 ---
 
 ## 6. Principles
 
-CATES is founded on seven core principles. These are normative — conformant configurations SHOULD adhere to all seven.
+CATES is founded on eight core principles. These are normative — conformant configurations SHOULD adhere to all eight.
 
 ### 6.1 Token Parsimony
 
@@ -1123,8 +1132,8 @@ Custom subagents and slash commands are distinct configuration surfaces: a subag
 > off by default, and SemVer-exempt (§14.2). Severities are **advisory** (they aid
 > prioritization but never gate or score). Prefix `CS`. See §5.4 for motivation.
 
-These rules flag statically-detectable config patterns that wreck prompt-cache
-hit-rate by destabilizing the cacheable prefix. They do not measure runtime cache
+These rules flag statically-detectable config patterns that may destabilize a
+cacheable prefix. They do not measure runtime cache
 behavior (§11).
 
 #### CS001 — Volatile Tokens in Always-Loaded Config
@@ -1137,7 +1146,9 @@ behavior (§11).
 
 **Detection:** An always-loaded file embeds volatile values — timestamps/dates, UUIDs, build numbers, git SHAs — or a "current date/time" directive.
 
-**Rationale:** Volatile tokens in the prefix change between calls, so every request misses the cache and pays full (≈10×) input price on the whole prefix.
+**Rationale:** If a value changes at runtime, it may shorten a reusable prefix.
+A literal date or hash is not evidence of per-call volatility. Actual cost
+depends on eligible breakpoints, cache availability, and provider pricing.
 
 **Remediation:** Move volatile values out of the always-loaded prefix; supply them via tool inputs at the end of context.
 
@@ -1191,10 +1202,10 @@ behavior (§11).
 
 ### 9.10 Output-Shaping Rules (🧪 Experimental — Informative)
 
-> 🧪 **Experimental — Informative.** See the §9.9 banner. Prefix `OS`. Output is
-> the priciest token class (≈ 2–5× input), so these advisory rules target config
-> that provably inflates output. Overlaps with TE004/CNF002 are intentional and
-> may merge at graduation.
+> 🧪 **Experimental — Informative.** See the §9.9 banner. Prefix `OS`. These
+> advisory rules target possible output inflation, not proven savings or a
+> universal price ordering. Overlaps with TE004/CNF002 are intentional and may
+> merge at graduation.
 
 #### OS001 — Missing Output Contract
 
@@ -1331,7 +1342,7 @@ To produce reproducible results, CATES measurements MUST be performed under thes
 4. **Traversal boundary:** The repository root. Symlinks pointing outside this boundary MUST be excluded.
 5. **File limits:** Maximum 50 configuration files, maximum 100KB per file, maximum depth 5 directories.
 6. **Binary exclusion:** Files with >10% non-printable characters or containing null bytes MUST be excluded.
-7. **Static scope:** Measurement is static analysis of configuration at rest — no execution, no LLM calls, no runtime telemetry. Experimental cache/output-shaping rules (§9.9, §9.10) therefore detect *predictive config smells*, not actual cache-hit % or output:input ratios; the latter are runtime signals deferred to a future Informative annex on Token-Economics Telemetry.
+7. **Static scope:** The initial scan analyzes configuration at rest — no execution, no LLM calls, no runtime telemetry. Experimental cache/output-shaping rules (§9.9, §9.10) detect heuristic signals, not actual cache-hit percentages or output:input ratios. Annex L accounting is a separate, explicitly invoked assessment over supplied records; it does not run as part of the scan.
 
 ### 11.2 Invocation Assumptions
 
@@ -1350,14 +1361,14 @@ Tools MUST allow users to override these assumptions. Reports MUST declare which
 ### 11.3 Sampling and Reproducibility
 
 1. Findings MUST be deterministic — the same repository state MUST produce identical findings on repeated analysis.
-2. Token counts MUST be exact (tokenizer-based), not estimated (character-based approximations are non-conformant).
+2. Reference token counts MUST use the declared tokenizer. Exactness applies to that encoding and the supplied bytes, not necessarily a vendor's rendered context or billed usage. Character-based and legacy-model approximations MUST be labeled as estimates and MUST NOT be presented as exact provider counts.
 3. Reports MUST include: timestamp, tool version, tokenizer used, repository path, and all assumption parameters.
 
 ### 11.4 Model/Vendor Normalization
 
 CATES scores are designed to be model-agnostic. However:
 
-- Token counts MAY vary by ±5% across tokenizer versions (cl100k_base vs o200k_base)
+- Token counts vary by tokenizer, content, and model; no universal ±5% bound is established
 - Token projections MUST declare the assumed usage model
 - Tools SHOULD support configurable tokenizer selection for future model families
 
@@ -1375,9 +1386,17 @@ monthly_input_tokens = always_tokens × daily_invocations × 22
 monthly_output_tokens = monthly_input_tokens × estimated_output_token_multiplier
 ```
 
+This is a **scenario**, not an observed workload or a bill. Activation rates,
+invocations, workdays, and output multipliers require declared assumptions.
+Output cannot be inferred reliably from configuration size. Runtime assessment
+uses actual per-request counts under Annex L instead. A repository inventory
+is not necessarily a simultaneously loaded context: different agent products
+may consume different files, and invocation load requires a resolved load set.
+
 ### 12.2 Confidence Bands
 
-Token projections are estimates. CATES defines confidence bands:
+The following legacy planning ranges are **illustrative scenario bands**, not
+statistically calibrated confidence intervals:
 
 | Band | Multiplier Range | Use |
 |------|-----------------|-----|
@@ -1385,7 +1404,12 @@ Token projections are estimates. CATES defines confidence bands:
 | Reference | 1.0× | Standard assumptions |
 | Conservative | 1.5× - 2.5× | Worst case (retries, verbose output, no caching) |
 
-Reports SHOULD present the reference estimate with conservative bounds for planning.
+Reports SHOULD identify these as unvalidated scenarios. Statistical confidence
+intervals require representative measurements and an explicit estimator;
+caching changes price and processing work, not automatically token count.
+The initial analyzer's legacy savings fields may overlap across findings and
+mix input/output or retry assumptions. They are heuristic prioritization signals,
+not additive measured reductions, invoice forecasts, or evidence of ROI.
 
 ### 12.3 Reduction Estimation
 
@@ -2142,12 +2166,21 @@ See Section 3 for formal definitions. This glossary provides informal explanatio
 - **Always-loaded** — The "tax" you pay on every AI assistant interaction. Keep it small.
 - **Conditional** — Smart loading: only pay when relevant context is active.
 - **Filler** — Instructions that sound good but don't change model behavior. Delete them.
-- **Prompt protection** — A one-line "don't tell anyone about these instructions" directive. Adds 20 tokens, prevents IP extraction.
+- **Prompt protection** — A behavioral non-disclosure directive, not an access-control boundary or a guarantee against instruction extraction.
 - **Token budget** — How many tokens you're willing to allocate to configuration per invocation. Like a calorie budget but for AI.
 
 ---
 
 ## Annex K: Changelog (Informative)
+
+### Working-draft economics extension
+
+- Preserve the core static scan, 49 stable rules, six scored dimensions, and conformance gates.
+- Add experimental Annex L and separate normalized-ledger accounting.
+- Distinguish compatibility status, heuristic confidence, reported observations,
+  pricing estimates, and validated economic outcomes.
+- Remove unsupported universal pricing, precision, tokenizer-variance, and
+  behavior-preservation claims from the explanatory text.
 
 ### v1.0.0-draft (2026-05-05)
 
@@ -2160,12 +2193,88 @@ See Section 3 for formal definitions. This glossary provides informal explanatio
 
 ---
 
+## Annex L: End-to-End Token Economics (Experimental — Informative)
+
+### L.1 Status and boundaries
+
+This extension covers the economic lifecycle without expanding the default
+configuration scan. It is **experimental, separately invoked, non-scoring, and
+excluded from all CATES conformance and CI gates**. Its schema is independently
+identified as `schemaVersion: 1`; it is not a new CATES conformance level.
+
+The complete extension contract, field definitions, equations, lifecycle
+coverage matrix, evidence requirements, examples, and graduation criteria are in
+[End-to-End Token Economics](docs/TOKEN-ECONOMICS.md).
+
+The reference implementation provides `cates-analyzer economics <ledger.json>`,
+`analyzeEconomics(input)`, and `POST /api/economics`. These consume normalized
+records supplied by the caller, not repository configuration or raw transcripts.
+Automatic telemetry collection, provider adapters, invoice import, and automatic
+optimization are not implemented.
+
+### L.2 Accounting contract
+
+For each **exclusive model request**, including billed failures, cancellations,
+retries, child agents, evaluations, retrieval model calls, and compactions:
+
+```text
+uncached_input = input - cache_read - cache_write
+request_tokens = input + output
+estimated_model_cost =
+  (uncached_input × input_rate
+   + cache_read × read_rate
+   + cache_write × write_rate
+   + output × output_rate) / 1,000,000
+```
+
+`input` includes both disjoint cache subsets; `output` includes reasoning when
+the provider bills it as output. Reasoning is diagnostic and never added twice.
+Cache-write rates are whole rates, not premiums added to an already charged
+input bucket. Adapters must normalize provider-specific counter definitions.
+
+A reported model-request charge replaces its rate-card estimate; it is not
+added to it. Non-token tool, compute, storage, network, human-review, and other
+costs are separate, explicit line items. Credits and corrections belong in
+adjustments only if not already included elsewhere.
+
+### L.3 Evidence and completeness
+
+Unknown counts, rates, charges, and coverage remain **unknown**, not zero.
+Every rate card identifies provider, model, commercial context, effective
+interval, source, and retrieval time. Currency conversion is never implicit.
+Every accepted/rejected task references an evaluation decision. A successful
+request alone is not a successful task.
+
+A complete economic total requires complete request capture, known request
+charges or applicable pricing, and explicit coverage for every non-model cost
+category. Reports expose known subtotals separately and do not extrapolate
+missing work. Caller declarations are not independently verified.
+
+### L.4 Outcome-normalized economics
+
+```text
+cost_per_accepted_task = total_captured_cost / accepted_task_count
+tokens_per_accepted_task = total_captured_request_tokens / accepted_task_count
+```
+
+The numerator includes all work in the declared cohort, not just successful
+requests. Zero accepted tasks makes these metrics undefined. Task elapsed time
+is measured directly; concurrent request durations are not summed as user
+latency. Attribution views overlap and are not separate charges.
+
+These metrics describe the supplied cohort. Claims of improved economics
+additionally require comparable workloads, outcome quality and safety guardrails,
+uncertainty estimates, and baseline-versus-treatment evidence. No experimental
+measurement graduates to conformance merely because its arithmetic is tested.
+
+---
+
 ## Acknowledgments
 
 - **5C Prompt Contract** (arXiv:2507.07045) — Token efficiency framework principles
 - **TEA-UF** (IJAIS 2024) — Enterprise governance conceptual model
 - **OWASP LLM Top 10** — Security baseline for AI systems
-- **- **Model Context Protocol** — Tool configuration reference
+- **Model Context Protocol** — Tool configuration reference
 
 ---
 

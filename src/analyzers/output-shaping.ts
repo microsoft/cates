@@ -7,8 +7,7 @@ import { countTokens } from '../utils/tokenizer.js';
  * EXPERIMENTAL — Output-Shaping detectors (OS0xx). Non-normative, zero scoring
  * weight. See docs/EXPERIMENTAL-CACHE-OUTPUT-DIMENSIONS.md.
  *
- * Output is the priciest token class (≈ 2–5× input). These static detectors flag
- * config that provably inflates output: no output contract, full-file-rewrite
+ * These static detectors flag possible output inflation: no output contract, full-file-rewrite
  * mandates, unconditional verbose reasoning, echo/restatement, verbose formats.
  * Per-response token estimates are advisory only.
  */
@@ -63,8 +62,8 @@ export function detectOutputShaping(files: OutputFile[]): ExperimentalFinding[] 
     // OS001 — substantial instruction file that never bounds output at all.
     if (INSTRUCTION_TYPES.has(file.type) && fileTokens >= 150 && !OUTPUT_CONTRACT_RE.test(file.content)) {
       findings.push(mk('OS001', 'medium', 'medium', file.relativePath, undefined,
-        'Missing output contract: this instruction set never bounds output (no length cap, "code only/no preamble", or format spec), so responses default to verbose.',
-        'Add a concise output contract, e.g. "Default to code only with no preamble; explain only when asked."',
+        'No recognized output contract found; review whether output expectations are sufficiently clear for this workflow.',
+        'Define task-appropriate output expectations and verify that concision does not reduce correctness or require retries.',
         '', 300));
     }
 
@@ -80,7 +79,7 @@ export function detectOutputShaping(files: OutputFile[]): ExperimentalFinding[] 
     const os002 = firstMatch(FULL_FILE_RE);
     if (os002 >= 0) {
       findings.push(mk('OS002', 'high', 'medium', file.relativePath, os002 + 1,
-        'Full-file rewrite mandate forces emitting entire files instead of diffs/patches — large, avoidable output on every edit.',
+        'Full-file output directive may generate more tokens than targeted edits when the workflow supports patches.',
         'Prefer diffs/patches or targeted edits; reserve full-file output for newly created files.',
         lines[os002]!.trim().slice(0, 80), 1000));
     }
@@ -91,8 +90,8 @@ export function detectOutputShaping(files: OutputFile[]): ExperimentalFinding[] 
     const os003line = os003 >= 0 ? os003 : os003alt;
     if (os003line >= 0) {
       findings.push(mk('OS003', 'medium', 'medium', file.relativePath, os003line + 1,
-        'Unconditional verbose reasoning forces detailed explanation/CoT on every response regardless of task, inflating output.',
-        'Make reasoning depth conditional on task complexity rather than global.',
+        'Verbose explanation directive may increase output; static wording does not measure hidden reasoning or actual response length.',
+        'Make explanation depth task-appropriate and evaluate quality, output usage, and retries before claiming savings.',
         lines[os003line]!.trim().slice(0, 80), 400));
     }
 
@@ -100,8 +99,8 @@ export function detectOutputShaping(files: OutputFile[]): ExperimentalFinding[] 
     const os004 = firstMatch(ECHO_RE);
     if (os004 >= 0) {
       findings.push(mk('OS004', 'low', 'low', file.relativePath, os004 + 1,
-        'Output echo/restatement directive makes the agent repeat the prompt/context back, adding output tokens with no value.',
-        'Remove echo/restatement requirements; have the agent act directly.',
+        'Echo/restatement directive may add unnecessary output when confirmation is not needed.',
+        'Keep confirmation where it prevents mistakes; remove redundant restatement only after reviewing the workflow.',
         lines[os004]!.trim().slice(0, 80), 150));
     }
 

@@ -18,6 +18,7 @@ import { generateRecommendations } from '../scoring/recommendations.js';
 import { calculateSavings } from '../scoring/savings.js';
 import { applySuppressions } from '../suppressions.js';
 import { applyRuleConfig } from '../rule-config.js';
+import { analyzeCopilot } from '../copilot/index.js';
 
 /**
  * Main analysis orchestrator.
@@ -33,7 +34,8 @@ export async function analyze(rawOptions: Partial<AnalyzerOptions> & { repoPath:
 
 async function analyzeWithContext(options: AnalyzerOptions): Promise<AnalysisResult> {
   // Phase 1: Discovery (secure file enumeration + single read of every file)
-  const { result: discovery, contents } = await discoverFiles(options);
+  const coreDiscovery = await discoverFiles(options);
+  const { result: discovery, contents } = coreDiscovery;
 
   const activeFiles: AnalyzerFile[] = discovery.files
     .filter(f => f.isActive)
@@ -131,6 +133,9 @@ async function analyzeWithContext(options: AnalyzerOptions): Promise<AnalysisRes
       }));
     experimental = analyzeExperimental(experimentalInput, options);
   }
+  const copilot = options.copilot
+    ? await analyzeCopilot(options, coreDiscovery)
+    : undefined;
 
   return {
     repoPath: options.repoPath,
@@ -146,5 +151,6 @@ async function analyzeWithContext(options: AnalyzerOptions): Promise<AnalysisRes
     disabledRuleIds: ruleConfigResult.disabledRuleIds,
     disabledDimensions: ruleConfigResult.disabledDimensions,
     ...(experimental ? { experimental } : {}),
+    ...(copilot ? { copilot } : {}),
   };
 }

@@ -2,8 +2,9 @@
 // Licensed under the MIT license.
 import { resolve, relative, isAbsolute } from 'node:path';
 import { readdir, stat, realpath, open } from 'node:fs/promises';
-import type { DiscoveredFile, DiscoveryResult, ConfigType, ConfigScope, AnalyzerOptions } from '../types.js';
+import type { DiscoveredFile, DiscoveryResult, DiscoveryDiagnostic, ConfigType, ConfigScope, AnalyzerOptions } from '../types.js';
 import { countTokens, countTokensAcross, getDefaultTokenizer, type TokenizerId } from '../utils/tokenizer.js';
+import { parseFrontmatter } from '../utils/config-parser.js';
 
 export interface DiscoveryOutput {
   result: DiscoveryResult;
@@ -102,24 +103,44 @@ const CONFIG_PATTERNS: Array<{ pattern: RegExp; type: ConfigType; scope: ConfigS
   { pattern: /^\.aider\..*$/i, type: 'extension-config', scope: 'conditional' },
 ];
 
-type FileClassification = { type: ConfigType; scope: ConfigScope; refineScope?: (content: string) => ConfigScope };
+export type FileClassification = { type: ConfigType; scope: ConfigScope; refineScope?: (content: string) => ConfigScope };
 
-export async function discoverFiles(options: AnalyzerOptions): Promise<DiscoveryOutput> {
+export async function discoverFiles(
+  options: AnalyzerOptions,
+  classify: (path: string) => FileClassification | undefined = path => CONFIG_PATTERNS.find(p => p.pattern.test(path)),
+  cached?: DiscoveryOutput,
+): Promise<DiscoveryOutput> {
   const repoRoot = await realpath(resolve(options.repoPath));
   const files: DiscoveredFile[] = [];
   const contents = new Map<string, string>();
+  const cachedFiles = new Map(cached?.result.files.map(file => [file.path, file]));
   const activeContents: string[] = []; // retained only when comparison is requested
   const tokenizer: TokenizerId = options.tokenizer ?? getDefaultTokenizer();
   const compareSet: TokenizerId[] | undefined = options.compareTokenizers && options.compareTokenizers.length > 0
     ? Array.from(new Set<TokenizerId>([tokenizer, ...options.compareTokenizers]))
     : undefined;
   let filesScanned = 0;
+  const diagnostics: DiscoveryDiagnostic[] = [];
+  const diagnose = (path: string, reason: DiscoveryDiagnostic['reason'], message: string): void => {
+    diagnostics.push({ path: relative(repoRoot, path).split('\\').join('/') || '.', reason, message });
+  };
 
   async function addFile(fullPath: string, relativePath: string, match: FileClassification): Promise<void> {
     filesScanned++;
     const realFullPath = await realpath(fullPath);
     if (!isInside(repoRoot, realFullPath)) {
       throw new Error(`Discovered file escapes repository boundary: ${relativePath}`);
+    }
+    const cachedFile = cachedFiles.get(realFullPath);
+    const cachedContent = cached?.contents.get(realFullPath);
+    if (cachedFile && cachedContent !== undefined && cachedFile.sizeBytes <= options.maxFileSize) {
+      const scope = match.refineScope ? match.refineScope(cachedContent) : match.scope;
+      const tokenCount = !cachedFile.isActive || cached?.result.tokenizer === tokenizer ? cachedFile.tokenCount : countTokens(cachedContent, tokenizer);
+      files.push({ ...cachedFile, relativePath, type: match.type, scope, tokenCount });
+      contents.set(realFullPath, cachedContent);
+      if (compareSet && cachedFile.isActive) activeContents.push(cachedContent);
+      if (!cachedFile.isActive) diagnose(realFullPath, 'tokenization-limit', 'BPE token count omitted for a pathological unbroken text span; source remains available to structural checks.');
+      return;
     }
 
     // Open once and reuse the same file descriptor for stat + read so the file
@@ -128,9 +149,11 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
     const fh = await open(realFullPath, 'r');
     try {
       const fileStat = await fh.stat();
+      if (!fileStat.isFile()) throw new Error(`Discovered path is not a regular file: ${relativePath}`);
 
       // Security: enforce size limit
       if (fileStat.size > options.maxFileSize) {
+        diagnose(realFullPath, 'oversized', `Not analyzed: file exceeds ${options.maxFileSize} bytes.`);
         files.push({
           path: realFullPath,
           relativePath,
@@ -138,23 +161,45 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
           scope: match.scope,
           sizeBytes: fileStat.size,
           tokenCount: 0,
-          isActive: false, // too large = likely not a real config
+          isActive: false,
         });
         return;
       }
 
       // Read as Buffer so the binary heuristic operates on raw bytes and
       // we can skip the UTF-8 decode entirely for binary files.
-      const buffer = await fh.readFile();
-      if (isBinary(buffer)) return;
+      const bounded = Buffer.alloc(options.maxFileSize + 1);
+      let bytesRead = 0;
+      while (bytesRead < bounded.length) {
+        const chunk = await fh.read(bounded, bytesRead, bounded.length - bytesRead, bytesRead);
+        if (chunk.bytesRead === 0) break;
+        bytesRead += chunk.bytesRead;
+      }
+      if (bytesRead > options.maxFileSize) {
+        diagnose(realFullPath, 'oversized', 'Not analyzed: file grew beyond the byte limit while being read.');
+        return;
+      }
+      const buffer = bounded.subarray(0, bytesRead);
+      if (isBinary(buffer)) {
+        diagnose(realFullPath, 'binary', 'Not analyzed: candidate configuration contains binary data.');
+        return;
+      }
       const content = buffer.toString('utf-8');
 
+      const usesBpe = tokenizer !== 'approx' || compareSet?.some(id => id !== 'approx');
+      if (usesBpe && hasPathologicalSpan(content)) {
+        diagnose(realFullPath, 'tokenization-limit', 'BPE analysis omitted: a text span exceeds 4,096 non-whitespace characters. Split embedded data or explicitly use the approx tokenizer without BPE comparisons.');
+        files.push({ path: realFullPath, relativePath, type: match.type, scope: match.scope, sizeBytes: bytesRead, tokenCount: 0, isActive: false });
+        contents.set(realFullPath, content);
+        return;
+      }
       const tokenCount = countTokens(content, tokenizer);
 
       // Some file types determine their loading scope from their contents
       // (e.g. `.instructions.md` files whose `applyTo` glob targets every file
       // are effectively always-loaded).
       const scope = match.refineScope ? match.refineScope(content) : match.scope;
+      if (match.refineScope && scope === 'unknown') diagnose(realFullPath, 'scope-error', 'Instruction applicability could not be parsed; its loading scope is unknown.');
 
       files.push({
         path: realFullPath,
@@ -190,7 +235,7 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
       }
 
       const relativePath = relative(repoRoot, realFilePath).split('\\').join('/');
-      const match = CONFIG_PATTERNS.find(p => p.pattern.test(relativePath)) ?? {
+      const match = classify(relativePath) ?? {
         type: 'unknown' as const,
         scope: 'conditional' as const,
       };
@@ -199,29 +244,36 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
   }
 
   async function walk(dir: string, depth: number): Promise<void> {
-    if (depth > options.maxDepth) return;
-    if (filesScanned >= options.maxFiles) return;
+    if (depth > options.maxDepth) {
+      diagnose(dir, 'max-depth', `Directory not traversed: depth exceeds ${options.maxDepth}.`);
+      return;
+    }
+    if (filesScanned >= options.maxFiles) {
+      diagnose(dir, 'max-files', `Discovery stopped at ${options.maxFiles} candidates; additional files may exist.`);
+      return;
+    }
 
     let entries;
     try {
       entries = await readdir(dir, { withFileTypes: true });
-    } catch {
-      return; // permission denied, etc.
+    } catch (error) {
+      if (!(error instanceof Error) || !('code' in error) || !['EACCES', 'EPERM', 'ENOENT'].includes(String(error.code))) throw error;
+      diagnose(dir, 'unreadable', `Directory not traversed (${String(error.code)}).`);
+      return;
     }
 
-    for (const entry of entries) {
-      if (filesScanned >= options.maxFiles) break;
+    for (const entry of entries.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
+      if (filesScanned >= options.maxFiles) {
+        diagnose(dir, 'max-files', `Discovery stopped at ${options.maxFiles} candidates; remaining entries were not assessed.`);
+        break;
+      }
 
       const fullPath = resolve(dir, entry.name);
 
       // Security: resolve real path and verify it's within repo boundary
       if (entry.isSymbolicLink()) {
-        try {
-          const real = await realpath(fullPath);
-          if (!isInside(repoRoot, real)) continue; // symlink escape attempt
-        } catch {
-          continue; // broken symlink
-        }
+        diagnose(fullPath, 'symlink', 'Automatic discovery does not follow symbolic links.');
+        continue;
       }
 
       // Skip common irrelevant directories
@@ -236,17 +288,25 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
       if (!entry.isFile()) continue;
 
       const relativePath = relative(repoRoot, fullPath).split('\\').join('/');
-      const match = CONFIG_PATTERNS.find(p => p.pattern.test(relativePath));
+      const match = classify(relativePath);
       if (!match) continue;
 
-      await addFile(fullPath, relativePath, match);
+      try {
+        await addFile(fullPath, relativePath, match);
+      } catch (error) {
+        if (!(error instanceof Error) || !('code' in error) || !['EACCES', 'EPERM', 'ENOENT'].includes(String(error.code))) throw error;
+        diagnose(fullPath, 'unreadable', `Candidate not analyzed (${String(error.code)}).`);
+      }
     }
   }
 
   if (options.includeFiles?.length) {
     await discoverIncludedFiles(options.includeFiles);
   } else {
-    await walk(repoRoot, 0);
+    const scanRoot = options.scanSubpath ? await realpath(resolve(repoRoot, options.scanSubpath)) : repoRoot;
+    if (!isInside(repoRoot, scanRoot)) throw new Error('Selected scan directory escapes repository boundary');
+    if (!(await stat(scanRoot)).isDirectory()) throw new Error('Selected scan path must be a directory');
+    await walk(scanRoot, 0);
   }
 
   const activeFiles = files.filter(f => f.isActive);
@@ -280,6 +340,7 @@ export async function discoverFiles(options: AnalyzerOptions): Promise<Discovery
       deadFileTokens,
       tokenizer,
       ...(totalTokensByTokenizer ? { totalTokensByTokenizer } : {}),
+      ...(diagnostics.length ? { diagnostics } : {}),
     },
     contents,
   };
@@ -311,14 +372,21 @@ function isInside(root: string, candidate: string): boolean {
  * counts against the always-loaded token budget.
  */
 function instructionsScope(content: string): ConfigScope {
-  const frontmatter = content.match(/^\s*---\r?\n([\s\S]*?)\r?\n---/);
-  if (!frontmatter) return 'conditional';
-  const applyTo = frontmatter[1]!.match(/^\s*applyTo\s*:\s*(.+?)\s*$/m);
-  if (!applyTo) return 'conditional';
-  const globs = applyTo[1]!
-    .replace(/^\[|\]$/g, '')
-    .split(',')
-    .map(g => g.trim().replace(/^['"]|['"]$/g, ''))
-    .filter(Boolean);
+  let applyTo: unknown;
+  try {
+    applyTo = parseFrontmatter(content).metadata.applyTo;
+  } catch {
+    return 'unknown'; // Reported as a scope-error by discovery, never silently treated as globally loaded.
+  }
+  const globs = typeof applyTo === 'string' ? applyTo.split(',').map(glob => glob.trim()) : Array.isArray(applyTo) ? applyTo : [];
   return globs.some(g => g === '**' || g === '**/*') ? 'always-loaded' : 'conditional';
+}
+
+function hasPathologicalSpan(content: string): boolean {
+  let length = 0;
+  for (const character of content) {
+    if (/\s/u.test(character)) length = 0;
+    else if (++length > 4096) return true;
+  }
+  return false;
 }
