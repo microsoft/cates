@@ -71,7 +71,7 @@ export async function analyzeCopilot(options: AnalyzerOptions, coreDiscovery?: D
           if (!present && target !== 'vscode') emit('GHCP004', 'Copilot CLI/cloud agents need YAML frontmatter; VS Code Local agents can omit it.');
           checkAgent(metadata, body, target, emit);
           identity('Agent filename', basename(file.relativePath).replace(/(?:\.agent)?\.md$/i, ''));
-          if (/\/chatmodes\/|\.ya?ml$/i.test(file.relativePath)) emit('GHCP003', 'Legacy chat-mode/YAML candidate: current Copilot custom agents use Markdown profiles in .github/agents/.');
+          if (/\/chatmodes\//i.test(file.relativePath) || /\.ya?ml$/i.test(file.relativePath)) emit('GHCP003', 'Legacy chat-mode/YAML candidate: current Copilot custom agents use Markdown profiles in .github/agents/.');
         }
         if (surface === 'skills') {
           checkSkill(file.relativePath, metadata, emit);
