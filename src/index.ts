@@ -23,6 +23,14 @@ export { evaluateConformance, evaluateGates } from './conformance.js';
 export { RULE_CATALOG, getRule } from './rules/catalog.js';
 export { ANALYZER_VERSION } from './version.js';
 export type { AnalysisResult, Finding, Score, AnalyzerOptions } from './types.js';
+export { COPILOT_CHECKS, getCopilotCheck } from './copilot/catalog.js';
+export { formatCopilot } from './copilot/report.js';
+export type { CopilotReport, CopilotFinding, CopilotCheck, CopilotSurface } from './copilot/types.js';
+export type { CopilotTarget, DiscoveryDiagnostic } from './types.js';
+
+// Experimental, separately invoked runtime accounting; never part of analyze().
+export { analyzeEconomics, formatEconomics, EconomicsInputSchema, ECONOMICS_LIMITS } from './economics/index.js';
+export type { EconomicsInput, EconomicsReport, RequestEconomics } from './economics/index.js';
 
 // Optimizer: a separate, deliberately-invoked tool that rewrites primitives for
 // token efficiency with a guaranteed no-loss-of-function property.

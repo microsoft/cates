@@ -31,9 +31,10 @@
     clearError();
     result.hidden = false;
 
-    $('r-score').textContent = data.score.overall;
-    $('r-score').className = 'value ' + gradeClass(data.score.grade);
-    $('r-grade').textContent = data.score.grade;
+    const hasCoreFiles = data.discovery.files.some(file => file.isActive);
+    $('r-score').textContent = hasCoreFiles ? data.score.overall : '—';
+    $('r-score').className = 'value ' + (hasCoreFiles ? gradeClass(data.score.grade) : '');
+    $('r-grade').textContent = hasCoreFiles ? data.score.grade : 'No active core-scan files';
 
     $('r-findings').textContent = data.findings.length;
     $('r-critical').textContent = data.score.criticalCount + ' critical';
@@ -41,6 +42,14 @@
     $('r-tokens').textContent = (data.discovery?.alwaysLoadedTokens ?? 0).toLocaleString();
     $('r-waste').textContent = data.score.estimatedTokenWaste.toLocaleString();
     $('r-waste-pct').textContent = data.score.estimatedTokenSavingsPercentage + '% of analyzed tokens';
+    const limitations = data.discovery?.diagnostics ?? [];
+    $('r-discovery-warning').hidden = limitations.length === 0 && hasCoreFiles;
+    $('r-discovery-warning').textContent = !hasCoreFiles
+      ? 'No files were assessed by the stable core scan. Check Copilot hygiene and coverage below; an empty core scan is not a passing assessment.'
+      : limitations.length
+      ? `Scan coverage is limited: ${limitations.length} skipped/limited path(s). A score is not a complete-repository certification.`
+      : '';
+    renderCopilot(data.copilot);
 
     const dimRows = data.score.dimensions.map(d => `
       <tr>
@@ -59,7 +68,28 @@
         <td><code>${escape(f.file)}</code>${f.line ? ' :' + f.line : ''}</td>
         <td>${escape(f.message)}${f.suggestion ? `<div class="hint">↳ ${escape(f.suggestion)}</div>` : ''}</td>
       </tr>`).join('');
-    $('r-finding-rows').innerHTML = findingRows || '<tr><td colspan="4" style="text-align:center;color:var(--good);">No findings — clean run 🎉</td></tr>';
+    $('r-finding-rows').innerHTML = findingRows || '<tr><td colspan="4">No stable-rule findings in the checked files.</td></tr>';
+  }
+
+  function renderCopilot(report) {
+    $('r-copilot').hidden = !report;
+    if (!report) return;
+    $('r-copilot-summary').textContent = `${report.findings.length} advisory finding(s) · ${report.target} · ${report.scope} · ${report.completeness}. ${report.disabledFindings.length} disabled, ${report.suppressedFindings.length} suppressed. Not scored; stable CI gates are unchanged.`;
+    $('r-copilot-coverage').innerHTML = report.coverage.map(row =>
+      `<tr><td>${escape(row.surface)}</td><td>${row.files}</td><td>${row.checked}</td></tr>`).join('');
+    $('r-copilot-diagnostics').innerHTML = report.diagnostics.map(item =>
+      `<p class="hint"><strong>${escape(item.reason)}</strong> · ${escape(item.path)}: ${escape(item.message)}</p>`).join('');
+    $('r-copilot-unchecked').innerHTML = report.files.filter(file => file.status !== 'checked').map(file =>
+      `<p class="hint">${escape(file.status)} · <code>${escape(file.path)}</code></p>`).join('');
+    $('r-copilot-findings').innerHTML = [...report.findings]
+      .sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
+      .map(f => `<article class="finding-card">
+        <header><code>${escape(f.ruleId)}</code><span class="pill sev-${escape(f.severity)}">${escape(f.severity)}</span><span class="hint">${escape(f.basis)}</span></header>
+        <p><code>${escape(f.file)}</code>${f.line ? ':' + f.line : ''}</p>
+        <p>${escape(f.message)}</p><p class="hint">${escape(f.suggestion)}</p>
+      </article>`).join('') || '<p class="hint">No advisory findings in the checked files. The external checks below remain unassessed.</p>';
+    $('r-copilot-manual').innerHTML = report.manualChecks.map(check =>
+      `<details><summary>${escape(check.title)} · not assessed</summary><p class="hint">${escape(check.verification)}</p></details>`).join('');
   }
 
   function severityRank(s) {
@@ -98,12 +128,14 @@
     dimensions: {}, // dimension -> false (disabled)
   };
   let ruleCatalog = [];
+  let copilotCatalog = [];
 
   async function loadRuleCatalog() {
     try {
       const res = await fetch('/api/rules');
       const data = await res.json();
       ruleCatalog = data.rules ?? [];
+      copilotCatalog = data.copilotChecks ?? [];
       renderDrawer();
     } catch (err) {
       console.warn('Failed to load /api/rules; toggles disabled', err);
@@ -126,7 +158,8 @@
     });
 
     const groups = {};
-    for (const r of ruleCatalog) (groups[r.dimension] ||= []).push(r);
+    const visibleCatalog = [...ruleCatalog, ...($('copilot-target').value ? copilotCatalog : [])];
+    for (const r of visibleCatalog) (groups[r.dimension] ||= []).push(r);
     const groupsEl = document.getElementById('rule-groups');
     groupsEl.innerHTML = DIMENSIONS
       .filter(d => groups[d])
@@ -140,7 +173,7 @@
             const effectiveOff = ruleOff || (dimOff && toggleState.rules[r.id] !== true);
             return `<label class="${effectiveOff ? 'disabled' : ''}" title="${escape(r.title)}">
               <input type="checkbox" data-rule="${r.id}" ${effectiveOff ? '' : 'checked'} />
-              <code>${r.id}</code> <span style="color:var(--muted);font-size:11px;">${escape(severityShort(r.severity))}</span>
+              <code>${r.id}</code> <span style="color:var(--muted);font-size:12px;">${escape(severityShort(r.severity))}${r.id.startsWith('GHCP') ? ' · advisory' : ''}</span>
             </label>`;
           })
           .join('');
@@ -157,7 +190,7 @@
           delete toggleState.rules[id];
           // If a dimension is disabled but the user re-enabled this rule,
           // record an explicit enable so the server overrides the dim toggle.
-          const r = ruleCatalog.find(x => x.id === id);
+          const r = visibleCatalog.find(x => x.id === id);
           if (r && toggleState.dimensions[r.dimension] === false) {
             toggleState.rules[id] = true;
           }
@@ -182,8 +215,9 @@
     for (const [d, v] of Object.entries(toggleState.dimensions)) {
       dimensions[d] = { enabled: v };
     }
-    if (Object.keys(rules).length === 0 && Object.keys(dimensions).length === 0) return undefined;
+    if (Object.keys(rules).length === 0 && Object.keys(dimensions).length === 0 && !$('copilot-target').value) return undefined;
     const policy = {};
+    if ($('copilot-target').value) policy.copilot = $('copilot-target').value;
     if (Object.keys(rules).length) policy.rules = rules;
     if (Object.keys(dimensions).length) policy.dimensions = dimensions;
     return policy;
@@ -191,6 +225,7 @@
 
   function toCatesYaml() {
     const lines = ['# Generated by the CATES Service drawer'];
+    if ($('copilot-target').value) lines.push(`copilot: ${$('copilot-target').value}`);
     const dims = Object.entries(toggleState.dimensions);
     if (dims.length) {
       lines.push('dimensions:');
@@ -208,6 +243,7 @@
   document.getElementById('reset-toggles').addEventListener('click', () => {
     toggleState.rules = {};
     toggleState.dimensions = {};
+    $('copilot-target').value = '';
     renderDrawer();
     document.getElementById('yml-preview').hidden = true;
   });
@@ -228,6 +264,16 @@
   });
 
   loadRuleCatalog();
+  $('copilot-target').addEventListener('change', () => {
+    renderDrawer();
+    if (!$('yml-preview').hidden) $('yml-text').textContent = toCatesYaml();
+  });
+  $('paste-type').addEventListener('change', () => {
+    if ($('paste-type').selectedOptions[0].hasAttribute('data-copilot') && !$('copilot-target').value) {
+      $('copilot-target').value = 'all';
+      renderDrawer();
+    }
+  });
 
   $('run-paste').addEventListener('click', async () => {
     const content = $('paste-content').value;

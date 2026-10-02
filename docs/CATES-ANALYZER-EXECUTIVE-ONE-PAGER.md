@@ -6,6 +6,13 @@
 
 The analyzer is not an AI assistant and does not call a model. It is a governance and measurement tool: it evaluates the files that shape AI coding-agent behavior before those files create token bloat, risk, or inconsistent outcomes at scale.
 
+The initial scan is unchanged. A separate **experimental economics assessment**
+now consumes caller-supplied usage, rates/charges, and task outcomes, reporting
+cost per accepted task with explicit coverage gaps. It does not automatically
+collect telemetry, verify invoices, or prove an optimization's benefit.
+The [Annex L implementation guide](TOKEN-ECONOMICS.md) distinguishes shipped
+accounting from unvalidated hypotheses and future diagnostics.
+
 ## What it does
 
 The analyzer reviews the configuration assets used by modern coding-agent ecosystems, including instructions, prompt libraries, agent definitions, rules, MCP/tool configuration, setup steps, hooks, and editor settings. It then produces a structured report that can be used by individual teams, platform engineering groups, security teams, and executive stakeholders.

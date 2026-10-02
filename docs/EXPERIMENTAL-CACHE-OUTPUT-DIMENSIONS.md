@@ -4,7 +4,7 @@
 > Everything described here ships **off by default**, carries **zero scoring weight**,
 > is **excluded from conformance and CI gates**, and is **SemVer-exempt** (rules may
 > change or be removed in a minor release). Nothing here changes a repository's existing
-> CATES score or conformance level unless a user explicitly opts in.
+> CATES score or conformance level, even when a user explicitly opts in.
 
 **Release target:** `cates-analyzer` 1.3.0 (minor) · **Created:** 2026-06-24 · **Implementation verified:** 2026-09-14
 
@@ -12,26 +12,26 @@
 
 ## 1. Summary
 
-CATES's stable score optimizes one token class: **input** (the `token-efficiency` dimension shrinks
-always-loaded config). But under token-based billing, input is the *cheapest* class. Two
-higher-leverage classes are unaddressed:
+CATES's stable score primarily evaluates configuration input. Two further
+economic areas warrant investigation:
 
-- **Cache** — a cache *hit* costs ≈ **0.1×** input (≈ 90% off). Whether a request hits is
-  driven by **prefix stability**, which is partly visible in static config.
-- **Output** — output tokens cost ≈ **2–5× input** and drive latency. Several config
-  anti-patterns provably inflate output.
+- **Cache** — stable rendered prefixes can support reuse, but eligibility,
+  availability, TTL, and pricing require provider/runtime evidence.
+- **Output** — output contracts may reduce unnecessary generation, but shorter
+  responses can also cause truncation, missing artifacts, or additional retries.
 
-*(Illustrative ratios — Claude-family, 2026; verify per model/provider. The structural
-ordering `output ≫ uncached-input ≫ cached-input` is stable across vendors.)*
+There is no universal price ordering or fixed ratio across providers, models,
+modalities, tiers, and commercial arrangements. These detectors establish
+neither cache hits nor realized output savings.
 
 The implementation adds two **experimental** scoring dimensions — `cache-shaping` and
-`output-shaping` — that flag the **statically-detectable** config smells which wreck cache
-hit-rate or inflate output, **without** touching the established score until the rules earn
+`output-shaping` — that flag **statically-detectable** configuration signals that
+may affect cache reuse or output, **without** touching the established score until the rules earn
 graduation.
 
-> The framing: CLEAR/CATES optimize *input authoring*. This adds two orthogonal axes —
-> **Cache** (structure) and **Output** (contract) — that can be improved without changing a
-> single instruction's meaning, so functionality is preserved by construction.
+> These are investigation hypotheses, not behavior-preserving transformations
+> or validated savings. Changing instruction ordering or output requirements
+> requires representative quality and outcome evaluation.
 
 ---
 
@@ -67,13 +67,14 @@ Config patterns that *predict* poor cache/output economics: volatile tokens in t
 prefix, dynamic-before-static ordering, full-file-rewrite mandates, unbounded output, forced
 verbose reasoning, etc. (rules in §4).
 
-### Out of scope (future, informative) — runtime telemetry
+### Separate assessment — runtime accounting
 Actual **cache-hit %**, **output:input ratio**, **reasoning-token share**, sticky-routing,
-and stream-and-cancel are **runtime** signals. They require a telemetry feed (gateway or
-billing export), not source files. Proposed as a **future Informative Annex G —
-Token-Economics Telemetry** and a possible `cates-rt` ingest mode. **Explicitly not in 1.3.0.**
-Calling this out prevents the failure mode of asserting runtime numbers the static analyzer
-cannot measure.
+and stream-and-cancel are **runtime** signals, not facts recoverable from source
+files. [Experimental Annex L](TOKEN-ECONOMICS.md) now provides a separate
+`cates-analyzer economics` assessment over caller-normalized usage, charges,
+and outcomes. It does not add telemetry to the initial scan. Automatic
+collectors, adapters, routing/cancellation diagnostics, and causal savings
+validation are still not implemented.
 
 ---
 
@@ -87,13 +88,13 @@ experimental (they aid prioritization but never gate or score).
 
 | ID | Title | Sev | Static detection (config at rest) |
 |----|-------|-----|-----------------------------------|
-| **CS001** | Volatile Tokens in Always-Loaded Config | high | Always-loaded scope embeds timestamps/dates, UUIDs, build numbers, git SHAs, or `current date/time` directives → busts the prefix every call. |
+| **CS001** | Volatile Tokens in Always-Loaded Config | high | Always-loaded scope embeds timestamps/dates, UUIDs, build numbers, git SHAs, or `current date/time` directives. Investigate whether values actually vary at runtime. |
 | **CS002** | Dynamic-Before-Static Ordering | medium | Prompt/instruction template places variable placeholders (`${…}`, `{{…}}`) or `@include`s **ahead** of a large static block, minimizing the cacheable prefix. |
 | **CS003** | Non-Deterministic Context Directive | medium | Instructions tell the agent to inject live/volatile state at the top (e.g., "always include current git status / latest logs / today's date"). |
 | **CS004** | Unstable Tool/Context Ordering | low | Directives that randomize or re-sort tool lists / retrieved context per call. |
 | **CS005** | Fragmented Preamble (no shared prelude) | info | High cross-file near-duplication of preamble that could be one shared, cacheable prelude (correlates with `TE006`). |
 
-### 4.2 Output-Shaping (`OS0xx`) — contain the priciest token class
+### 4.2 Output-Shaping (`OS0xx`) — investigate generation overhead
 
 | ID | Title | Sev | Static detection (config at rest) |
 |----|-------|-----|-----------------------------------|
@@ -111,13 +112,15 @@ or promote rules.
 ## 5. Architecture & code changes (file-by-file)
 
 ### 5.1 `src/types.ts`
-- Extend `Dimension` with `'cache-shaping' | 'output-shaping'` **for typing only** — these
-  do **not** get weights (see 5.4).
-- Add a stability marker and a dedicated channel:
+- Keep `ExperimentalDimension` separate from the stable `Dimension` union.
+  It cannot enter stable scoring weights.
+- Use a stability marker and a dedicated channel:
   ```ts
   export type Stability = 'stable' | 'experimental';
 
-  export interface ExperimentalFinding extends Finding {
+  export type ExperimentalDimension = 'cache-shaping' | 'output-shaping';
+  export interface ExperimentalFinding extends Omit<Finding, 'dimension'> {
+    dimension: ExperimentalDimension;
     stability: 'experimental';
   }
 
@@ -125,7 +128,7 @@ or promote rules.
   experimental?: {
     enabled: boolean;
     findings: ExperimentalFinding[];
-    dimensions: DimensionScore[]; // informational only; weight = 0
+    dimensions: ExperimentalDimensionScore[]; // display-only, not stable scores
   };
   ```
 - Keep `result.findings` **stable-only**. Experimental findings live solely under
@@ -155,8 +158,8 @@ or promote rules.
 
 ### 5.5 `src/conformance.ts`
 - No behavioral change required **because** experimental findings never reach
-  `result.findings`. Add a defensive filter + a unit test proving `level{1,2,3}Failures`
-  ignore `stability: 'experimental'` even if one leaked in.
+  `result.findings`. Isolation regression tests compare scores and conformance
+  with experimental mode on and off.
 
 ### 5.6 `src/rule-config.ts` + `.cates.yml`
 - Add a top-level `experimental: boolean` (default `false`) to the policy schema.
@@ -196,17 +199,16 @@ Leverage the existing §4.5 *Normative vs. Informative* split — experimental c
   status marker for rule IDs.
 - **§4.5** — add an "Experimental (non-normative)" status: experimental rules are Informative,
   carry zero weight, and are excluded from conformance classes/profiles.
-- **§5 Conceptual Model** — extend 5.1/5.2 with the **token cost vector**
-  (cached-input ≈ 0.1×, uncached-input 1×, cache-write 1.25–2×, output ≈ 5×) and a
-  **prefix-stability** concept; note `1 output ≈ ~50 cached-input` as motivation.
+- **§5 Conceptual Model** — identify input, cache-read/write, output, non-model
+  costs, and outcome evidence without asserting universal price multipliers.
 - **§9.9 Cache-Shaping Rules (Experimental)** and **§9.10 Output-Shaping Rules
   (Experimental)** — full rule definitions using the §9.1 attribute table, each headed
   "Experimental — Informative".
 - **§8 Conformance** — one sentence: experimental rules are excluded from all classes/profiles.
 - **§10 Scoring** — one sentence: experimental dimensions have weight 0 and are excluded from
   the overall score and grade.
-- **§11 Measurement** — reaffirm static-only; reference future **Annex G (Telemetry)** for
-  runtime cache/output measurement.
+- **§11 Measurement** — keep the initial scan static-only; reference the
+  separately invoked **Annex L** for runtime accounting.
 
 ---
 
@@ -248,7 +250,10 @@ Leverage the existing §4.5 *Normative vs. Informative* split — experimental c
 - [x] **Phase 3 — Output-Shaping.** `output-shaping.ts` + `OS001–OS005` + fixtures + tests + §9.10.
 - [x] **Phase 4 — Docs & DX.** `docs/RULE-CATALOG.md` experimental section, this guide linked
       from README (with a 🧪 note), `examples/`, `explain`/`rules` 🧪 markers.
-- [ ] **Phase 5 — Future (separate proposal).** Annex G telemetry + `cates-rt` ingest.
+- [x] **Separate extension.** Annex L normalized-ledger accounting through
+      `economics`, the library, and HTTP API; no automatic telemetry ingestion.
+- [ ] **Further evidence.** Provider adapters, labeled validation corpora, and
+      controlled outcome comparisons before economic recommendations graduate.
 
 ---
 
@@ -273,25 +278,25 @@ migration note. Until then, weight stays 0.
 | False positives erode trust | Advisory-only severity, off by default, `explain` rationale, easy per-rule disable. |
 | Users build automation on unstable IDs | `"stability":"experimental"` in JSON + SemVer-exempt clause + separate channel. |
 | Overlap/confusion with `TE`/`CNF` rules | Document overlaps in §9.9/§9.10; plan merges at graduation. |
-| Scope creep into runtime claims | Hard line in §3; telemetry deferred to Annex G. |
+| Scope creep into runtime claims | Static detectors stay separate from Annex L; runtime collection and causal inference are not implied. |
 
 ---
 
 ## 12. Open questions
 
-- [ ] Confirm GitHub Copilot / AI-credits per-model treatment of cached input & output before
-      quoting ratios in any customer-facing surface (don't cite Anthropic/OpenAI numbers as
-      GitHub's). TBB hub: aka.ms/ghcpubb.
-- [ ] One combined `token-economics-experimental` dimension vs. two (`cache-shaping`,
-      `output-shaping`)? Two is clearer for graduation; one is simpler in the report.
-- [ ] Should `--experimental` also be enabled by an env var for CI experimentation
-      (`CATES_EXPERIMENTAL=1`)?
-- [ ] Minimum file-size thresholds for `OS001`/`CS002` to suppress noise on tiny configs.
+- Provider and platform pricing requires caller-supplied evidence; no
+  cross-provider or AI-credit ratios are asserted.
+- Two static experimental dimensions are implemented; runtime accounting has
+  no dimension score.
+- `CATES_EXPERIMENTAL=1` is supported by the CLI.
+- `OS001` currently uses 150 tokens and `CS002` a 200-token following block.
+  These are heuristic thresholds, not empirically vetted optimums.
+- Precision/recall and intervention outcomes still need published evaluation.
 
 ---
 
 ### References
 - Source ideation: *"Scaling Prompt Optimization — Beyond Input Tokens (Cache & Output
   Shaping)"* (three-axis model: Input / Cache / Output).
-- Pricing ratios are illustrative (Claude-family, 2026) and vary by provider/model — verify
-  against the current model card before use in customer-facing material.
+- See [Annex L's primary-source references and validation protocol](TOKEN-ECONOMICS.md)
+  for provider semantics, evidence boundaries, and economic graduation.

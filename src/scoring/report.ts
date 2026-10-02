@@ -3,6 +3,7 @@
 import type { AnalysisResult } from '../types.js';
 import { getRule } from '../rules/catalog.js';
 import { ANALYZER_VERSION } from '../version.js';
+import { formatCopilot } from '../copilot/report.js';
 
 /**
  * Format analysis results for different output targets.
@@ -50,6 +51,9 @@ function toPretty(result: AnalysisResult): string {
   lines.push(`     ${discovery.files.length} config file(s) found`);
   lines.push(`     ${discovery.totalTokens.toLocaleString()} total tokens in active configs${discovery.tokenizer ? ` (${discovery.tokenizer})` : ''}`);
   lines.push(`     ${discovery.alwaysLoadedTokens.toLocaleString()} tokens always-loaded`);
+  for (const diagnostic of discovery.diagnostics ?? []) {
+    lines.push(`     NOT ASSESSED [${diagnostic.reason}] ${diagnostic.path}: ${diagnostic.message}`);
+  }
   if (discovery.conditionalTokens > 0) {
     lines.push(`     ${discovery.conditionalTokens.toLocaleString()} tokens conditional`);
   }
@@ -155,6 +159,7 @@ function toPretty(result: AnalysisResult): string {
   if (result.experimental) {
     lines.push(...experimentalLines(result));
   }
+  if (result.copilot) lines.push(formatCopilot(result.copilot));
 
   lines.push('─'.repeat(62));
   lines.push(`  Analyzed: ${result.repoPath}`);
@@ -210,6 +215,12 @@ function toSarif(result: AnalysisResult): string {
     $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json',
     version: '2.1.0',
     runs: [{
+      ...(result.copilot || result.discovery.diagnostics ? {
+        properties: {
+          ...(result.copilot ? { copilot: result.copilot } : {}),
+          ...(result.discovery.diagnostics ? { discoveryDiagnostics: result.discovery.diagnostics } : {}),
+        },
+      } : {}),
       tool: {
         driver: {
               name: 'cates-analyzer',

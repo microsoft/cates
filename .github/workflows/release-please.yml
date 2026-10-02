@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions: read-all
 
@@ -13,6 +14,7 @@ concurrency:
 
 jobs:
   release-please:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -28,4 +30,11 @@ jobs:
 
       - name: Report disabled release automation
         if: env.RELEASE_PLEASE_TOKEN == ''
-        run: echo "::notice::Set RELEASE_PLEASE_TOKEN to enable release PR automation under the repository branch ruleset."
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          echo "::notice::Set RELEASE_PLEASE_TOKEN to enable release PR automation under the repository branch ruleset."
+          echo "Release automation is disabled: RELEASE_PLEASE_TOKEN is not configured." >> "$GITHUB_STEP_SUMMARY"
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            exit 1
+          fi

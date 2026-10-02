@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "currency": "USD",
+  "source": {
+    "kind": "scenario",
+    "reference": "Synthetic illustration only; these are not vendor prices or production measurements."
+  },
+  "window": {
+    "startedAt": "2026-10-01T10:00:00Z",
+    "endedAt": "2026-10-01T10:03:00Z"
+  },
+  "requestCoverage": "complete",
+  "costCoverage": {
+    "tools": "complete",
+    "compute": "complete",
+    "storage": "not-applicable",
+    "network": "not-applicable",
+    "human-review": "complete",
+    "other": "not-applicable",
+    "adjustments": "complete"
+  },
+  "rateCards": [{
+    "id": "illustrative-standard",
+    "provider": "example-provider",
+    "model": "example-model",
+    "context": "Synthetic text-only standard tier; cache-write rate includes base input, not an additive surcharge.",
+    "source": "Made-up rates for arithmetic demonstration, not a quote.",
+    "retrievedAt": "2026-10-01T00:00:00Z",
+    "effectiveFrom": "2026-10-01T00:00:00Z",
+    "effectiveTo": "2026-11-01T00:00:00Z",
+    "perMillion": { "input": 2, "cacheRead": 0.2, "cacheWrite": 2.5, "output": 10 }
+  }],
+  "tasks": [
+    {
+      "id": "accepted-task",
+      "startedAt": "2026-10-01T10:00:00Z",
+      "endedAt": "2026-10-01T10:02:00Z",
+      "outcome": "accepted",
+      "outcomeEvidence": "Synthetic evaluator record: acceptance criteria and review passed."
+    },
+    {
+      "id": "rejected-task",
+      "startedAt": "2026-10-01T10:02:00Z",
+      "endedAt": "2026-10-01T10:03:00Z",
+      "outcome": "rejected",
+      "outcomeEvidence": "Synthetic evaluator record: required regression check failed."
+    }
+  ],
+  "requests": [
+    {
+      "id": "attempt-1", "taskId": "accepted-task",
+      "provider": "example-provider", "model": "example-model",
+      "purpose": "planning", "status": "failed",
+      "startedAt": "2026-10-01T10:00:00Z", "endedAt": "2026-10-01T10:00:10Z",
+      "usage": { "input": 1000, "cacheRead": 0, "cacheWrite": 400, "output": 200, "reasoning": 100 },
+      "rateCardId": "illustrative-standard"
+    },
+    {
+      "id": "attempt-2", "taskId": "accepted-task", "retryOf": "attempt-1",
+      "provider": "example-provider", "model": "example-model",
+      "purpose": "generation", "status": "succeeded",
+      "startedAt": "2026-10-01T10:00:15Z", "endedAt": "2026-10-01T10:02:00Z",
+      "usage": { "input": 1500, "cacheRead": 400, "cacheWrite": 0, "output": 300, "reasoning": 150 },
+      "rateCardId": "illustrative-standard"
+    },
+    {
+      "id": "verification-child", "taskId": "accepted-task", "parentRequestId": "attempt-2",
+      "provider": "example-provider", "model": "example-model",
+      "purpose": "verification", "status": "succeeded",
+      "startedAt": "2026-10-01T10:00:30Z", "endedAt": "2026-10-01T10:01:30Z",
+      "usage": { "input": 500, "cacheRead": 0, "cacheWrite": 0, "output": 100, "reasoning": 0 },
+      "rateCardId": "illustrative-standard"
+    },
+    {
+      "id": "rejected-work", "taskId": "rejected-task",
+      "provider": "example-provider", "model": "example-model",
+      "purpose": "generation", "status": "succeeded",
+      "startedAt": "2026-10-01T10:02:00Z", "endedAt": "2026-10-01T10:02:10Z",
+      "usage": { "input": 300, "cacheRead": 0, "cacheWrite": 0, "output": 100, "reasoning": 0 },
+      "rateCardId": "illustrative-standard"
+    }
+  ],
+  "additionalCosts": [
+    { "id": "review", "taskId": "accepted-task", "category": "human-review", "amount": 0.5, "source": "Synthetic review time multiplied by an explicit labor rate." },
+    { "id": "runner", "category": "compute", "amount": 0.01, "source": "Synthetic allocated execution cost." },
+    { "id": "search", "category": "tools", "amount": 0.02, "source": "Synthetic external search charge, excluding model tokens." },
+    { "id": "credit", "category": "adjustments", "amount": -0.005, "source": "Synthetic credit not already included in model charges." }
+  ]
+}

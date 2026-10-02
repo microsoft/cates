@@ -34,7 +34,10 @@
     "LICENSE",
     "LICENSE.TXT",
     "PRIVACY",
-    "CATES-v1.0.md"
+    "CATES-v1.0.md",
+    "docs/TOKEN-ECONOMICS.md",
+    "docs/COPILOT-HYGIENE.md",
+    "examples/economics.json"
   ],
   "scripts": {
     "build": "tsc && chmod +x dist/cli/index.js dist/optimizer/cli.js",
@@ -76,6 +79,7 @@
     "express": "^5.2.1",
     "helmet": "^8.3.0",
     "js-tiktoken": "^1.0.18",
+    "jsonc-parser": "^3.3.1",
     "ora": "^9.4.1",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"

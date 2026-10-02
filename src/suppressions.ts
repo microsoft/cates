@@ -2,17 +2,17 @@
 // Licensed under the MIT license.
 import type { Finding, Suppression, SuppressionSummary } from './types.js';
 
-export interface SuppressionResult {
-  findings: Finding[];
-  suppressedFindings: Finding[];
+export interface SuppressionResult<T extends Finding = Finding> {
+  findings: T[];
+  suppressedFindings: T[];
   summary: SuppressionSummary;
 }
 
-export function applySuppressions(findings: Finding[], suppressions: Suppression[], now = new Date()): SuppressionResult {
+export function applySuppressions<T extends Finding>(findings: T[], suppressions: Suppression[], now = new Date()): SuppressionResult<T> {
   const activeSuppressions = suppressions.filter(suppression => !isExpired(suppression, now));
   const expired = suppressions.length - activeSuppressions.length;
-  const remaining: Finding[] = [];
-  const suppressedFindings: Finding[] = [];
+  const remaining: T[] = [];
+  const suppressedFindings: T[] = [];
 
   for (const finding of findings) {
     if (activeSuppressions.some(suppression => matchesSuppression(finding, suppression))) {

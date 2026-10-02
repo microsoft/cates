@@ -16,8 +16,11 @@ import type { DemoCategory } from '../demo-repos.js';
 import { scanDemo, type DemoScanResult } from '../demo.js';
 import { isTokenizerId, listTokenizers, type TokenizerId } from '../utils/tokenizer.js';
 import { formatExperimental } from '../scoring/report.js';
-import type { AnalysisResult, Severity } from '../types.js';
+import { CopilotTargetSchema, type AnalysisResult, type Severity } from '../types.js';
+import { COPILOT_CHECKS, getCopilotCheck } from '../copilot/catalog.js';
 import { ANALYZER_VERSION } from '../version.js';
+import { analyzeEconomics, formatEconomics } from '../economics/index.js';
+import { readEconomicsInput } from '../economics/input.js';
 
 program
   .name('cates-analyzer')
@@ -36,6 +39,8 @@ Examples:
   $ cates-analyzer https://github.com/OWNER/REPO/pull/123   # pull request
   $ cates-analyzer demo --repos-file repos.txt --limit 10   # custom demo set
   $ cates-analyzer completion bash                          # shell completion
+  $ cates-analyzer economics usage.json --format json       # experimental runtime accounting
+  $ cates-analyzer . --copilot                              # experimental Copilot hygiene
 `);
 
 program.exitOverride((err) => {
@@ -89,6 +94,8 @@ program
   .option('--fix-dry-run', 'Show safe automatic fixes without writing files')
   .option('--experimental', 'Include experimental (non-normative) cache/output-shaping findings — not scored')
   .option('--experimental-only', 'Show only the experimental cache/output-shaping section')
+  .option('--copilot [target]', 'Add non-scoring Copilot hygiene: all (default), cli, cloud-agent, code-review, vscode')
+  .option('--no-copilot', 'Skip Copilot hygiene even when enabled by policy')
   .action(async (path: string, opts) => runAnalyze(path, opts));
 
 program
@@ -112,7 +119,25 @@ program
   .option('--no-gh', 'Use git directly instead of gh for GitHub sources')
   .option('--experimental', 'Include experimental (non-normative) cache/output-shaping findings — not scored')
   .option('--experimental-only', 'Show only the experimental cache/output-shaping section')
+  .option('--copilot [target]', 'Add non-scoring Copilot hygiene: all (default), cli, cloud-agent, code-review, vscode')
+  .option('--no-copilot', 'Skip Copilot hygiene even when enabled by policy')
   .action(async (source: string, opts) => runReview(source, opts));
+
+program
+  .command('economics')
+  .description('Experimental token economics from a normalized usage ledger (separate from scan/scoring)')
+  .argument('<file>', 'Local normalized economics JSON file; no telemetry collection or network calls')
+  .option('-f, --format <format>', 'Output format: pretty or json', 'pretty')
+  .action(async (file: string, opts) => {
+    try {
+      const format = formatOpt(opts.format, ['pretty', 'json']);
+      const result = analyzeEconomics(await readEconomicsInput(resolve(file)));
+      process.stdout.write((format === 'json' ? JSON.stringify(result, null, 2) : formatEconomics(result)) + '\n');
+    } catch (err) {
+      console.error('Error:', err instanceof Error ? err.message : err);
+      process.exitCode = 2;
+    }
+  });
 
 program
   .command('conformance')
@@ -149,16 +174,18 @@ program
   .command('rules')
   .description('Print the machine-readable CATES rule catalog')
   .option('-f, --format <format>', 'Output format: json or pretty', 'json')
+  .option('--copilot', 'Show the separate experimental Copilot hygiene check catalog')
   .action((opts) => {
     try {
       const format = formatOpt(opts.format, ['json', 'pretty']);
+      const catalog = opts.copilot ? COPILOT_CHECKS : RULE_CATALOG;
       if (format === 'pretty') {
-        for (const rule of RULE_CATALOG) {
+        for (const rule of catalog) {
           const tag = rule.stability === 'experimental' ? '🧪 ' : '';
           process.stdout.write(`${tag}${rule.id} ${rule.title} [${rule.severity}/${rule.dimension}]\n  ${rule.summary}\n`);
         }
       } else {
-        process.stdout.write(rulesAsJson() + '\n');
+        process.stdout.write((opts.copilot ? JSON.stringify(catalog, null, 2) : rulesAsJson()) + '\n');
       }
     } catch (err) {
       console.error('Error:', err instanceof Error ? err.message : err);
@@ -171,6 +198,11 @@ program
   .description('Explain a CATES rule')
   .argument('<ruleId>', 'Rule ID, e.g. TE004')
   .action((ruleId: string) => {
+    const copilotCheck = getCopilotCheck(ruleId);
+    if (copilotCheck) {
+      process.stdout.write(`${copilotCheck.id} - ${copilotCheck.title}\n\nEXPERIMENTAL Copilot hygiene; not scored or used by stable gates.\n\n${copilotCheck.summary}\n\nRemediation: ${copilotCheck.remediation}\n`);
+      return;
+    }
     const rule = getRule(ruleId.toUpperCase());
     if (!rule) {
       console.error(`Unknown CATES rule: ${ruleId}`);
@@ -273,9 +305,9 @@ async function runDemoCommand(opts: Record<string, unknown>): Promise<void> {
   }
 }
 
-async function executeAnalyze(repoPath: string, opts: Record<string, unknown>, displayPath?: string): Promise<number> {
+async function executeAnalyze(repoPath: string, opts: Record<string, unknown>, displayPath?: string, sourceFiles?: string[]): Promise<number> {
   const policy = await loadPolicy(repoPath, stringOpt(opts.policy));
-  const includeFiles = fileListOpt(opts.files);
+  const includeFiles = opts.files === undefined ? sourceFiles ?? [] : fileListOpt(opts.files);
   const format = formatOpt(opts.format, ['pretty', 'json', 'sarif']);
 
   if (opts.individual) {
@@ -345,12 +377,14 @@ function buildAnalyzeOptions(
     maxFiles: numberOpt(opts.maxFiles, '--max-files', { min: 1, integer: true }) ?? 50,
     maxDepth: numberOpt(opts.maxDepth, '--max-depth', { min: 0, integer: true }) ?? 5,
     includeFiles: includeFiles.length > 0 ? includeFiles : undefined,
+    scanSubpath: stringOpt(opts.scanSubpath),
     tokenizer: tokenizerOpt(opts.tokenizer),
     compareTokenizers: tokenizerListOpt(opts.compareTokenizers),
     suppressions: policy.suppressions ?? [],
     rules: policy.rules ?? {},
     dimensions: policy.dimensions ?? {},
     experimental: experimentalEnabled(opts, policy),
+    copilot: opts.copilot === false ? undefined : CopilotTargetSchema.optional().parse(opts.copilot === true ? 'all' : opts.copilot ?? policy.copilot),
   };
 }
 
@@ -396,7 +430,10 @@ async function runReview(source: string, opts: Record<string, unknown>): Promise
       preferGh: opts.gh !== false,
     });
     try {
-      const exitCode = await executeAnalyze(resolved.analyzePath, opts, resolved.displayName);
+      const exitCode = await executeAnalyze(resolved.repoPath, {
+        ...opts,
+        scanSubpath: resolved.scanSubpath,
+      }, resolved.displayName, resolved.includeFiles);
       if (exitCode !== 0) process.exit(exitCode);
     } finally {
       await resolved.cleanup?.();
@@ -566,13 +603,13 @@ program
 program.parse();
 
 function buildCompletionScript(shell: 'bash' | 'zsh'): string {
-  const subcommands = ['analyze', 'review', 'demo', 'portfolio', 'conformance', 'rules', 'explain', 'tokenizers', 'completion', 'help'];
+  const subcommands = ['analyze', 'review', 'demo', 'portfolio', 'economics', 'conformance', 'rules', 'explain', 'tokenizers', 'completion', 'help'];
   const flags = [
     '--format', '--quiet', '--policy', '--max-files', '--max-depth', '--files', '--individual',
     '--no-evidence', '--min-score', '--require-level', '--fail-on', '--max-always-loaded',
     '--tokenizer', '--compare-tokenizers', '--fix', '--fix-dry-run', '--demo', '--repos-file',
     '--category', '--limit', '--concurrency', '--keep-worktree', '--no-gh', '--fail-fast',
-    '--experimental', '--experimental-only',
+    '--experimental', '--experimental-only', '--copilot', '--no-copilot',
     '--help', '--version',
   ];
 

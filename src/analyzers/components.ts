@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 import { parse as parseYaml } from 'yaml';
+import { parseJsonConfig } from '../utils/config-parser.js';
 import type { Finding, AnalyzerOptions, AnalyzerFile } from '../types.js';
 import { countTokens } from '../utils/tokenizer.js';
 
@@ -130,7 +131,7 @@ export async function analyzeMcp(
     let config: unknown;
     try {
       if (file.relativePath.endsWith('.json')) {
-        config = JSON.parse(content);
+        config = parseJsonConfig(content, file.relativePath === '.vscode/mcp.json');
       } else {
         config = parseYaml(content);
       }
@@ -322,7 +323,7 @@ export async function analyzeSetupSteps(
           confidence: 'medium',
           message: 'Setup steps grant broad permissions beyond what coding agent typically needs.',
           file: file.relativePath,
-          suggestion: 'Restrict permissions to minimum required: contents:write is standard; id-token and packages may not be needed.',
+          suggestion: 'Grant only permissions required by setup steps. contents:read is sufficient for checkout; Copilot receives a separate token for its own operations.',
         });
       }
     }
@@ -442,7 +443,7 @@ export async function analyzeEditorConfig(
 ): Promise<Finding[]> {
   const findings: Finding[] = [];
 
-  const editorFiles = files.filter(f => f.relativePath.includes('settings.json'));
+  const editorFiles = files.filter(f => /(?:^|\/)settings(?:\.local)?\.json$/i.test(f.relativePath));
   if (editorFiles.length === 0) return findings;
 
   for (const file of editorFiles) {
@@ -456,18 +457,16 @@ export async function analyzeEditorConfig(
 
     let settings: Record<string, unknown>;
     try {
-      // VS Code settings can have comments — strip them
-      const cleaned = content.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
-      settings = JSON.parse(cleaned);
+      settings = parseJsonConfig(content, true);
     } catch {
       findings.push({
         ruleId: 'EDC001',
         dimension: 'completeness',
         severity: 'low',
         confidence: 'medium',
-        message: 'Editor/agent settings file has syntax errors (possibly trailing commas or comments).',
+        message: 'Editor/agent settings file has invalid JSONC syntax or is not an object.',
         file: file.relativePath,
-        suggestion: 'Ensure the settings file is valid JSONC. VS Code tolerates it but other tools may not.',
+        suggestion: 'Fix the settings object. Comments and trailing commas are accepted; malformed properties and values are not.',
       });
       continue;
     }

@@ -3,6 +3,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EventEmitter } from 'node:events';
 import type { Readable } from 'node:stream';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * Coverage for the materialize / spawn path in src/sources.ts.
@@ -72,5 +74,30 @@ describe('sources.ts materialize path (mocked spawn)', () => {
     await expect(
       resolveReviewSource('https://github.com/example/will-fail', { preferGh: false }),
     ).rejects.toThrow(/git clone .* failed/);
+  });
+
+  it.each([
+    ['blob/main/.github/skills/review/SKILL.md', ['.github/skills/review/SKILL.md']],
+    ['tree/main/.github/skills', ['.github/skills/other/SKILL.md', '.github/skills/review/SKILL.md']],
+  ])('preserves exact API scope for %s', async (suffix, expectedPaths) => {
+    const { handleScan } = await import('../service/api/handlers.js');
+    spawnMock.mockImplementation((_command: string, args: string[]) => {
+      if (args.includes('clone')) {
+        const root = args.at(-1)!;
+        for (const name of ['review', 'other']) {
+          const directory = join(root, '.github', 'skills', name);
+          mkdirSync(directory, { recursive: true });
+          writeFileSync(join(directory, 'SKILL.md'), `---\nname: ${name}\ndescription: Review changes\ntools: []\n---\nCheck the changes.\n`);
+        }
+      }
+      return makeChild(0);
+    });
+    const response = await handleScan({ url: `https://github.com/example/repo/${suffix}`, policy: { copilot: 'cli' } });
+    expect(response.ok).toBe(true);
+    if (response.ok) {
+      expect(response.body.copilot?.files.map(file => file.path).sort()).toEqual(expectedPaths);
+      expect(JSON.stringify(response.body)).not.toContain('cates-review-');
+      expect(response.body.copilot?.scope).toBe(suffix.startsWith('blob') ? 'selected-files' : 'selected-directory');
+    }
   });
 });

@@ -8,6 +8,13 @@ As AI coding tools become embedded across engineering teams, their configuration
 
 CATES gives leaders a common language and measurable framework for managing that risk.
 
+The initial scan remains focused on configuration conformance. **Experimental
+Annex L** extends the standard to end-to-end economics: actual request usage,
+cache and output accounting, retries and delegation, non-model costs, and cost
+per accepted task. These observations are separate from the configuration score.
+See the [lifecycle coverage and evidence contract](TOKEN-ECONOMICS.md); no
+unvalidated savings or vendor-independent price ratios are implied.
+
 ## Why it matters
 
 AI coding assistants are moving from experimentation to enterprise-scale adoption. Without a standard, each team creates its own prompts, rules, agent definitions, and tool permissions. The result is predictable: duplicated guidance, oversized context, unclear authority, insecure tool access, and inconsistent quality.

@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 import { z } from 'zod';
+import { AnalyzerOptionsSchema, CopilotTargetSchema } from '../../src/types.js';
 
 // ─── Shared scalar schemas ───────────────────────────────────────────────────
 
@@ -38,6 +39,9 @@ export const PolicyInputSchema = z
     maxAlwaysLoadedTokens: z.number().int().nonnegative().optional(),
     rules: z.record(z.string().min(1), RuleOverrideSchema).optional(),
     dimensions: z.partialRecord(DimensionSchema, RuleOverrideSchema).optional(),
+    suppressions: AnalyzerOptionsSchema.shape.suppressions.optional(),
+    experimental: z.boolean().optional(),
+    copilot: CopilotTargetSchema.optional(),
   })
   .strict();
 
@@ -55,10 +59,10 @@ export const FilePayloadSchema = z.object({
     .string()
     .min(1)
     .max(512)
-    .refine(p => !p.startsWith('/') && !p.includes('..'), {
-      message: 'Path must be repo-relative and not contain ..',
+    .refine(p => !/^(?:[/\\]|[A-Za-z]:)/.test(p) && !/[\0\r\n]/.test(p) && !p.split(/[/\\]/).some(segment => ['', '.', '..'].includes(segment)), {
+      message: 'Path must be repo-relative without traversal, empty segments or control characters',
     }),
-  content: z.string().max(MAX_BYTES_PER_FILE, {
+  content: z.string().refine(content => Buffer.byteLength(content, 'utf8') <= MAX_BYTES_PER_FILE, {
     message: `File content exceeds ${MAX_BYTES_PER_FILE} bytes`,
   }),
 });
@@ -70,9 +74,10 @@ export const AnalyzeRequestSchema = z
       .min(1)
       .max(MAX_FILES_PER_REQUEST)
       .refine(
-        files => files.reduce((sum, f) => sum + f.content.length, 0) <= MAX_TOTAL_BYTES,
+        files => files.reduce((sum, f) => sum + Buffer.byteLength(f.content, 'utf8'), 0) <= MAX_TOTAL_BYTES,
         { message: `Total payload exceeds ${MAX_TOTAL_BYTES} bytes` },
-      ),
+      )
+      .refine(files => new Set(files.map(file => file.path.split('\\').join('/'))).size === files.length, { message: 'Duplicate file paths are not allowed' }),
     policy: PolicyInputSchema.optional(),
     tokenizer: TokenizerSchema.optional(),
   })

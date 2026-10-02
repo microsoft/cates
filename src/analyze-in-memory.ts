@@ -1,10 +1,11 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { analyze } from './analyzers/index.js';
 import type { AnalysisResult, AnalyzerOptions, Finding } from './types.js';
+import { copilotSurface } from './copilot/discovery.js';
 
 /**
  * In-memory entry point that mirrors {@link analyze} for callers who already
@@ -46,11 +47,15 @@ export async function analyzeInMemory(options: AnalyzeInMemoryOptions): Promise<
     throw new Error('analyzeInMemory requires at least one file');
   }
 
-  const tempRoot = await mkdtemp(join(tmpdir(), 'cates-mem-'));
+  const tempRoot = await realpath(await mkdtemp(join(tmpdir(), 'cates-mem-')));
   try {
+    const suppliedPaths = new Set<string>();
     for (const file of options.files) {
       assertSafeRelativePath(file.path);
-      const target = join(tempRoot, file.path);
+      const normalizedPath = file.path.split('\\').join('/');
+      if (suppliedPaths.has(normalizedPath)) throw new Error(`Duplicate file path: ${file.path}`);
+      suppliedPaths.add(normalizedPath);
+      const target = join(tempRoot, normalizedPath);
       // Re-check after join to guard against any platform-specific oddities.
       if (!isInside(tempRoot, target)) {
         throw new Error(`Refusing unsafe path: ${file.path}`);
@@ -61,6 +66,19 @@ export async function analyzeInMemory(options: AnalyzeInMemoryOptions): Promise<
 
     const { files: _ignored, ...rest } = options;
     const result = await analyze({ ...rest, repoPath: tempRoot });
+    if (result.copilot) {
+      result.copilot.scope = 'supplied-files';
+      const inventoried = new Set(result.copilot.files.map(file => file.path));
+      for (const path of suppliedPaths) {
+        if (inventoried.has(path)) continue;
+        result.copilot.files.push({ path, surface: copilotSurface(path) ?? 'unrecognized', status: 'not-analyzed', tokens: null });
+        result.copilot.completeness = 'partial';
+      }
+      for (const row of result.copilot.coverage) {
+        row.files = result.copilot.files.filter(file => file.surface === row.surface).length;
+        row.status = row.files ? 'present' : 'not-detected';
+      }
+    }
 
     // Strip the temp prefix from absolute paths so callers see the paths
     // they supplied. Relative paths in findings already use `relativePath`
@@ -97,14 +115,14 @@ function assertSafeRelativePath(path: string): void {
   if (!path || typeof path !== 'string') {
     throw new Error('File path is required');
   }
-  if (isAbsolute(path) || path.startsWith('\\') || path.startsWith('/')) {
+  if (isAbsolute(path) || path.startsWith('\\') || path.startsWith('/') || /^[A-Za-z]:/.test(path)) {
     throw new Error(`File path must be repository-relative: ${path}`);
   }
   // Reject explicit traversal segments. join() will further normalize, but
   // we want to reject obviously hostile input loudly so the caller knows.
   const segments = path.split(/[\\/]/);
-  if (segments.some(s => s === '..' || s === '')) {
-    throw new Error(`File path may not contain '..' or empty segments: ${path}`);
+  if (segments.some(s => s === '..' || s === '.' || s === '')) {
+    throw new Error(`File path may not contain '.', '..' or empty segments: ${path}`);
   }
   if (/[\0\r\n]/.test(path)) {
     throw new Error(`File path contains control characters: ${path}`);

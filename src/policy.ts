@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import type { Dimension, Severity, Suppression } from './types.js';
+import { CopilotTargetSchema, type CopilotTarget, type Dimension, type Severity, type Suppression } from './types.js';
 
 export interface RuleOverride {
   enabled?: boolean;
@@ -24,6 +24,7 @@ export interface CatesPolicy {
   dimensions?: DimensionConfigMap;
   /** Opt in to experimental (non-normative) cache/output-shaping analysis. */
   experimental?: boolean;
+  copilot?: CopilotTarget;
 }
 
 export const DEFAULT_POLICY: Required<Pick<CatesPolicy, 'minScore' | 'requireLevel' | 'failOn' | 'maxAlwaysLoadedTokens'>> = {
@@ -66,6 +67,7 @@ function normalizePolicy(value: unknown): CatesPolicy {
     rules: parseRuleMap(input['rules']),
     dimensions: parseDimensionMap(input['dimensions']),
     experimental: typeof input['experimental'] === 'boolean' ? input['experimental'] : undefined,
+    copilot: CopilotTargetSchema.optional().parse(input['copilot']),
   };
 }
 
