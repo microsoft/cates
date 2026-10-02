@@ -327,7 +327,15 @@ function checkPlugin(path: string, config: Record<string, unknown>, cloud: boole
     if (!Array.isArray(config.plugins)) emit('GHCP013', 'Marketplace manifest requires a plugins array.');
     return;
   }
-  const portable = typeof config.$schema === 'string' && config.$schema.includes('agent-plugins.org');
+  let portable = false;
+  if (typeof config.$schema === 'string') {
+    try {
+      const schemaUrl = new URL(config.$schema);
+      portable = schemaUrl.protocol === 'https:' && schemaUrl.hostname === 'agent-plugins.org';
+    } catch {
+      portable = false;
+    }
+  }
   if (portable) {
     if (!/^https:\/\/agent-plugins\.org\/schemas\/1\.[01]\.0\/plugin\.schema\.json$/.test(String(config.$schema))) emit('GHCP013', 'Unrecognized Agent Plugins schema version in this snapshot; verify compatibility.');
     if (nonempty(config.name) && (config.name.length > 64 || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(config.name) || /--|\.\./.test(config.name))) emit('GHCP013', 'Agent Plugins name must meet the portable lowercase identifier constraints.');
