@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1128" height="628" viewBox="0 0 1128 628">
+<title>CATES feature map</title>
+<desc>Stable configuration scanning, experimental static advice, and separate usage accounting.</desc>
+<rect width="1128" height="628" fill="white"/>
+<text x="36" y="48.0" font-family="Arial,sans-serif" font-size="30" fill="#000000">Choose the question. Run the matching assessment.</text>
+<text x="36" y="100.0" font-family="Arial,sans-serif" font-size="17" fill="#000000">Start with the stable scan. Add the other views only when you need them.</text>
+<rect x="36" y="154" width="328" height="294" rx="14" stroke="#0078D4" fill="#CFE4FA" stroke-width="2"/>
+<text x="54" y="203.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">CONFIGURATION</text>
+<text x="54" y="248.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">Is the setup healthy?</text>
+<text x="54" y="293.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">... examples/quickstart</text>
+<text x="54" y="338.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">Score + findings + CI gates</text>
+<text x="54" y="383.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">Stable</text>
+<rect x="400" y="154" width="328" height="294" rx="14" stroke="#5C2D91" fill="#E8DAEF" stroke-width="2"/>
+<text x="418" y="203.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">STATIC ADVICE</text>
+<text x="418" y="248.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">Is Copilot set up well?</text>
+<text x="418" y="293.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">... . --copilot</text>
+<text x="418" y="338.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">... . --experimental</text>
+<text x="418" y="383.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">Experimental / not scored</text>
+<rect x="764" y="154" width="328" height="294" rx="14" stroke="#107C10" fill="#DFF6DD" stroke-width="2"/>
+<text x="782" y="203.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">USAGE ACCOUNTING</text>
+<text x="782" y="248.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">What did delivery cost?</text>
+<text x="782" y="293.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">... economics usage.json</text>
+<text x="782" y="338.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">Bring usage + outcome data</text>
+<text x="782" y="383.0" font-family="Arial,sans-serif" font-size="18" fill="#000000">Experimental / no score</text>
+<text x="36" y="510.0" font-family="Arial,sans-serif" font-size="20" fill="#000000">... means: node dist/cli/index.js</text>
+<text x="36" y="570.0" font-family="Arial,sans-serif" font-size="17" fill="#000000">Configuration scores are not bills. Experimental advice is not proof of savings.</text>
+</svg>

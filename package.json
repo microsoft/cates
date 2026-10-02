@@ -35,9 +35,8 @@
     "LICENSE.TXT",
     "PRIVACY",
     "CATES-v1.0.md",
-    "docs/TOKEN-ECONOMICS.md",
-    "docs/COPILOT-HYGIENE.md",
-    "examples/economics.json"
+    "docs",
+    "examples"
   ],
   "scripts": {
     "build": "tsc && chmod +x dist/cli/index.js dist/optimizer/cli.js",

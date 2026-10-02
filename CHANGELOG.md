@@ -74,6 +74,9 @@ Releases are automated via
 
 ### Documentation
 
+* Add a complete illustrated user guide, reproducible CLI/browser pictures,
+  an editable feature map and a runnable quick-start example. Simplify README
+  entry points and correct stale browser, file-scope and Helm instructions.
 * Document administrator/release activation, artifact acceptance, the managed
   fuzzing risk decision, and the actual unregistered Best Practices badge status.
 * Add the Copilot hygiene usage/coverage contract, dated primary references,

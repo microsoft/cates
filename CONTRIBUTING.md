@@ -49,6 +49,12 @@ Repository administrators and release maintainers should follow
 [the maintainer setup runbook](docs/MAINTAINER-SETUP.md). Prepared configuration
 does not imply that branch protection, public releases, or badges are active.
 
+Keep user-facing commands and screenshots aligned with the
+[illustrated user guide](docs/USER-GUIDE.md). Its quick-start example is fictional;
+preserve the intentional duplicate so the optimization preview remains useful.
+Regenerate pictures with `scripts/generate-guide-images.py` against a built CLI
+and local service, then review the output before committing image changes.
+
 Keep dependencies current within their supported release lines. The Node
 types stay on the oldest supported runtime major (22) to prevent accidental
 use of newer runtime APIs; patch and minor updates within that major are
