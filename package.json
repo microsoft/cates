@@ -37,6 +37,7 @@
     "CATES-v1.0.md",
     "docs/TOKEN-ECONOMICS.md",
     "docs/COPILOT-HYGIENE.md",
+    "docs/MODERN-AGENT-ASSURANCE.md",
     "examples/economics.json"
   ],
   "scripts": {

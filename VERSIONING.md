@@ -128,6 +128,14 @@ are released as document revisions, not as npm releases. When the standard
 graduates from `-draft` or moves to `1.1.0` / `2.0.0`, update the document
 header and reference the new version explicitly in analyzer release notes.
 
+Editorial corrections and dated source reviews may clarify a working draft
+without changing its normative predicates or claiming a new standard release.
+The [Modern Agent Assurance proposal](docs/MODERN-AGENT-ASSURANCE.md) is
+informative and manually assessed, not an implemented profile. Replacing legacy
+prompt-protection gates or adopting its proposed criteria into stable scoring
+requires an explicit migration and a major release wherever existing pass/fail
+behavior changes. New upstream publications do not silently change conformance.
+
 ## Experimental rules and dimensions
 
 Experimental rules and dimensions (currently cache-shaping `CS0xx` and
