@@ -49,7 +49,7 @@ repos:
 args:
   - demo
   - --repos-file
-  - /etc/cates/repos.txt
+  - /etc/cates-repos/repos.txt
   - --limit
   - "25"
   - --format
