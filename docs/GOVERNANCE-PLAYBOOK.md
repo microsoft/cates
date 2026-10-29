@@ -15,6 +15,20 @@
 4. Raise required level gradually from Level 1 to Level 2.
 5. Reserve Level 3 for showcase/high-volume repositories.
 
+## Current guidance and evidence review
+
+Use the [Modern Agent Assurance proposal](MODERN-AGENT-ASSURANCE.md) for a
+separate manual assessment of effective loading, trust boundaries, privileges,
+skills, MCP authorization, executable dependencies, and outcome preservation.
+Record evidence, unknowns, owner, date, and exception expiry without changing
+existing conformance gates. A prompt-protection phrase is not a security control.
+
+The Configuration Owner and Security Champion should review relevant primary
+sources at least quarterly and after meaningful client, protocol, permission,
+or dependency changes. Verify support in the deployed client before adopting
+new formats. Proposed requirements become automated only with implementation,
+fixtures, documented coverage, and the required compatibility/version review.
+
 ## End-to-end economics without changing the initial gate
 
 The existing scan remains the first assessment. Treat its score as

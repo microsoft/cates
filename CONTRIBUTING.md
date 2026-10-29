@@ -56,6 +56,14 @@ expected. Prerelease dependency versions are not adopted for stable releases.
 
 ## Pull requests
 
+For standards changes, cite primary sources with revision/retrieval dates and
+identify the affected client/session. Keep editorial corrections, proposed
+manual criteria, experimental checks, and stable requirements distinct. Do not
+claim analyzer support without implementation and fixtures. Follow
+[VERSIONING.md](VERSIONING.md) for changes to scoring or pass/fail behavior and
+the [Modern Agent Assurance proposal](docs/MODERN-AGENT-ASSURANCE.md) for the
+current review and graduation criteria.
+
 1. Fork the repo and create a topic branch from `main`.
 2. Make focused, minimal changes. Keep unrelated refactoring out of the PR.
 3. Add or update tests for any behavior changes.

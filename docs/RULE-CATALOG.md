@@ -14,6 +14,19 @@ cates-analyzer explain TE004
 
 The catalog includes ID, title, dimension, severity, summary, detection, remediation, CATES section, and autofix support.
 
+## Interpretation of legacy checks
+
+SEC004/SEC005 match prompt-protection/disclosure text; they do not prove
+confidentiality or an exploitable disclosure. AGT001 checks metadata presence,
+not effective least privilege. CMD001 does not establish that shell execution
+bypasses approval, and HK003's version-prefix heuristic does not establish
+age or vulnerability. Use target-client documentation and review evidence
+before remediating these findings.
+
+The [Modern Agent Assurance proposal](MODERN-AGENT-ASSURANCE.md) documents
+current guidance and proposed additions/replacements. Its `MA` labels are
+manual-review sections, not implemented rule IDs or additional scored checks.
+
 ## 🧪 Experimental rules (non-normative)
 
 The catalog also includes **experimental** cache-shaping (`CS001`–`CS005`) and

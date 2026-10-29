@@ -17,6 +17,12 @@ npx tsx src/cli/index.ts analyze . --format json > report.json
 5. Move project-specific guidance into scoped or on-demand files.
 6. Raise the policy to Level 2 once teams have remediated recurring findings.
 
+Before relocating or removing content, verify which files the deployed client
+loads and compare behavior on representative tasks. Use
+[Modern Agent Assurance](MODERN-AGENT-ASSURANCE.md) for the separate manual
+review; it is not an implemented analyzer profile. Do not treat legacy
+prompt-protection phrases as authorization or confidentiality controls.
+
 ## Policy file
 
 ```yaml
@@ -28,5 +34,6 @@ suppressions:
   - ruleId: SEC004
     file: generated/agent-doc.md
     reason: Generated documentation, not loaded by any agent
-    expires: 2026-12-31
+    owner: developer-experience
+    expires: "2026-12-31"
 ```

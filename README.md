@@ -8,6 +8,12 @@ The **initial scan remains a static configuration assessment**, not a bill or
 proof of economic performance. For end-to-end costs and accepted-task outcomes,
 use the separate, opt-in [experimental economics assessment](#experimental-end-to-end-token-economics).
 
+The [Modern Agent Assurance proposal](docs/MODERN-AGENT-ASSURANCE.md) records
+the October 29, 2026 standards review and current primary sources. It adds
+manual guidance for skills, effective permissions, MCP authorization, and
+outcome validation, not new scored rules or gates. Legacy prompt-secrecy checks
+are configuration heuristics, not enforceable security controls.
+
 For deeper **GitHub Copilot hygiene**, run `cates-analyzer . --copilot`.
 The [Copilot profile](docs/COPILOT-HYGIENE.md) adds 15 experimental checks across
 11 configuration families, explicit coverage limits, and a manual-verification
