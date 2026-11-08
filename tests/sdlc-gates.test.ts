@@ -5,6 +5,12 @@ import { describe, expect, it } from 'vitest';
 import { parseYamlConfig } from '../src/utils/config-parser.js';
 
 describe('SDLC verification contract', () => {
+  it('keeps dependency tarballs on the public npm registry', () => {
+    const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
+    for (const entry of Object.values(lock.packages) as { resolved?: string }[]) {
+      if (entry.resolved) expect(new URL(entry.resolved).hostname).toBe('registry.npmjs.org');
+    }
+  });
   it('preserves runtime audit, coverage, builds and artifact checks', () => {
     const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
     expect(manifest.scripts['audit:runtime']).toBe('npm audit --omit=dev --audit-level=high');
