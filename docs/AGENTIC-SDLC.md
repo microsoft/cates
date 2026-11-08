@@ -18,7 +18,8 @@ This is a human-triggered coding-agent lifecycle, not an unattended merge bot.
    Existing release workflows take over; production actions retain their gates.
 
 Local setup: `npm ci`. Complete handoff gate: **`npm run verify`**.
-It checks CLI/service types, coverage thresholds, both builds, then packs and
+It checks runtime dependency advisories (blocking HIGH/CRITICAL), CLI/service
+types, coverage thresholds, both builds, then packs and
 installs the actual npm artifact into a temporary directory and runs its CLI.
 The package smoke test needs registry access for runtime dependencies, never
 publish credentials. Temporary installation is removed even on failure.
@@ -118,5 +119,7 @@ timestamps and short handoff notes, not a new monitoring service.
 
 Weekly, review existing Dependabot and scheduled security results, pick bounded
 maintenance tasks, and remove instructions that do not change agent behavior.
+Keep CLI integration tests scoped to one subprocess per test so cold-start costs
+do not accumulate under a shared timeout. Preserve assertions and coverage gates.
 Use CATES to inspect agent configuration as an advisory signal; do not make a
 new score threshold a delivery gate until its behavior is understood.
