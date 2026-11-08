@@ -37,6 +37,8 @@ npm run build
 
 Other useful scripts:
 
+- `npm run verify` — the complete CI/handoff gate, including the service build
+  and a smoke test of an installed npm tarball.
 - `npm run lint` — type-checks both the CLI and the service workspace (acts as our lint pass).
 - `npm run test:coverage` — runs the Vitest suite with coverage.
 - `npm run release:check` — runs release validation and previews the npm tarball.
@@ -63,6 +65,10 @@ claim analyzer support without implementation and fixtures. Follow
 [VERSIONING.md](VERSIONING.md) for changes to scoring or pass/fail behavior and
 the [Modern Agent Assurance proposal](docs/MODERN-AGENT-ASSURANCE.md) for the
 current review and graduation criteria.
+
+For agent-assisted work, use the [agentic SDLC guide](docs/AGENTIC-SDLC.md)
+and the **Agent-ready task** issue template. Copilot instructions, a scoped SDLC
+agent, and planning/implementation/review prompts live under `.github/`.
 
 1. Fork the repo and create a topic branch from `main`.
 2. Make focused, minimal changes. Keep unrelated refactoring out of the PR.

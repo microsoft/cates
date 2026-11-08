@@ -26,6 +26,14 @@ branch-protection activation, release bootstrap, and the managed-fuzzing decisio
 
 ---
 
+## Agent-assisted development
+
+The [agentic SDLC guide](docs/AGENTIC-SDLC.md) connects issue intake, planning,
+implementation, review, releases, deployment and maintenance using the existing
+toolchain. Start with the **Agent-ready task** template and the **CATES SDLC**
+Copilot agent; run `npm run verify` before handoff. Agents assist with delivery;
+maintainers retain merge, publication and deployment authority.
+
 ## 🚀 Quick Start
 
 > **Distribution status:** This repository is release-ready, but no version tag
