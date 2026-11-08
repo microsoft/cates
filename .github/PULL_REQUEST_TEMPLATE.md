@@ -19,7 +19,11 @@
 - [ ] I updated documentation where relevant
 - [ ] My commits follow [Conventional Commits](https://www.conventionalcommits.org/)
 - [ ] No secrets or credentials are included in this PR
+- [ ] `npm run verify` passes locally (or unverified checks are explained below)
 
 ## Notes for reviewers
 
 <!-- Anything reviewers should pay particular attention to. -->
+
+<!-- For agent-assisted work: link the accepted task, map acceptance criteria to
+evidence, and disclose remaining risks, checks not run, and release/rollback impact. -->

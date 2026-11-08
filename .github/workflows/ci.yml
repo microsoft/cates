@@ -34,14 +34,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck (CLI + service)
-        run: npm run typecheck:all
-
-      - name: Test with coverage thresholds
-        run: npm run test:coverage
-
-      - name: Build
-        run: npm run build
-
-      - name: CLI smoke test
-        run: node dist/cli/index.js fixtures/good --format json --min-score 70
+      - name: Verify types, coverage, builds and packaged CLI
+        run: npm run verify

@@ -448,19 +448,40 @@ describe('Copilot policy, API, CLI and reports', () => {
     expect(createReport(full, 'pretty')).toContain('GHCP004');
     expect(JSON.parse(createReport(full, 'json')).copilot.findings.length).toBeGreaterThan(0);
   });
-  it('exposes the profile through CLI flags, policy, catalog and completion', async () => {
+  const cli = (...args: string[]) => execFileSync(process.execPath, ['--import', 'tsx', resolve('src/cli/index.ts'), ...args], { encoding: 'utf8' });
+  it.each([
+    { args: [], target: undefined },
+    { args: ['--copilot'], target: 'all' },
+    { args: ['--no-copilot'], target: undefined },
+  ])('exposes the CLI profile for $args', async ({ args, target }) => {
     const root = await repository([{ path: agent, content: md({ description: 'Review', tools: [] }) }]);
-    const cli = (...args: string[]) => execFileSync(process.execPath, ['--import', 'tsx', resolve('src/cli/index.ts'), ...args], { encoding: 'utf8' });
-    expect(JSON.parse(cli(root, '--format', 'json')).copilot).toBeUndefined();
-    expect(JSON.parse(cli(root, '--copilot', '--format', 'json')).copilot.target).toBe('all');
+    const report = JSON.parse(cli(root, ...args, '--format', 'json'));
+    if (target === undefined) expect(report.copilot).toBeUndefined();
+    else expect(report.copilot.target).toBe(target);
+  });
+  it('exposes the review CLI target', async () => {
+    const root = await repository([{ path: agent, content: md({ description: 'Review', tools: [] }) }]);
     expect(JSON.parse(cli('review', root, '--copilot', 'cli', '--format', 'json')).copilot.target).toBe('cli');
+  });
+  it.each([false, true])('handles policy CLI override: disabled=$disabled', async (disabled) => {
+    const root = await repository([{ path: agent, content: md({ description: 'Review', tools: [] }) }]);
     await writeFile(join(root, '.cates.yml'), 'copilot: vscode\n');
     expect((await loadPolicy(root)).copilot).toBe('vscode');
-    expect(JSON.parse(cli(root, '--format', 'json')).copilot.target).toBe('vscode');
-    expect(JSON.parse(cli(root, '--no-copilot', '--format', 'json')).copilot).toBeUndefined();
+    const report = JSON.parse(cli(root, ...(disabled ? ['--no-copilot'] : []), '--format', 'json'));
+    if (disabled) expect(report.copilot).toBeUndefined();
+    else expect(report.copilot.target).toBe('vscode');
+  });
+  it('includes the Copilot catalog', () => {
     expect(JSON.parse(cli('rules', '--copilot'))).toHaveLength(15);
+  });
+  it('explains Copilot rules', () => {
     expect(cli('explain', 'GHCP006')).toContain('Skill discovery contract');
+  });
+  it('includes Copilot completion flags', () => {
     expect(cli('completion', 'bash')).toContain('--copilot');
+  });
+  it('rejects an invalid Copilot policy target', async () => {
+    const root = await repository([{ path: agent, content: md({ description: 'Review', tools: [] }) }]);
     await writeFile(join(root, '.cates.yml'), 'copilot: bad-target\n');
     await expect(loadPolicy(root)).rejects.toThrow();
   });
