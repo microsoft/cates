@@ -98,12 +98,12 @@ function getSummary(dimension: Dimension, score: number, findingCount: number): 
   const quality = score >= 85 ? 'Excellent' : score >= 70 ? 'Good' : score >= 50 ? 'Needs work' : 'Critical attention needed';
 
   const labels: Record<Dimension, string> = {
-    'security': 'Security posture',
+    'security': 'Static security configuration',
     'token-efficiency': 'Token efficiency',
     'specificity': 'Instruction specificity',
     'completeness': 'Coverage completeness',
     'conflict-reachability': 'Conflict & reachability',
-    'harness-quality': 'Agent harness quality',
+    'harness-quality': 'Declared agent harness quality',
   };
 
   return `${labels[dimension]}: ${quality} (${findingCount} finding${findingCount === 1 ? '' : 's'})`;

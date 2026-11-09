@@ -19,16 +19,15 @@ class UsageError extends Error {}
 /**
  * `cates-optimize` — a SEPARATE, deliberately-invoked tool (not part of the
  * `cates-analyzer` flow). It consumes a CATES analysis and rewrites the Copilot
- * primitives to be as token-efficient as possible while guaranteeing no loss of
- * function, then prints a report of what it achieved.
+ * primitives with structural text checks, then reports source-token changes.
  */
 
 program
   .name('cates-optimize')
   .description(
-    'Apply lossless token-efficiency optimizations to coding-agent primitives ' +
+    'Apply structurally checked source-token transformations to coding-agent primitives ' +
     '(instructions, prompts, chat modes, agents, skills, rules) and report the gain. ' +
-    'Guarantees no loss of function. Separate from cates-analyzer — run it deliberately.',
+    'Checks text structure, not behavioral equivalence or runtime savings. Separate from cates-analyzer — run it deliberately.',
   )
   .version(ANALYZER_VERSION)
   .argument('[path]', 'Path to repository root', '.')

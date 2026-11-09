@@ -4,11 +4,8 @@ import type { AnalysisResult, ConfigScope, ConfigType, ExperimentalReport, Suppr
 import type { TokenizerId } from '../utils/tokenizer.js';
 
 /**
- * Every optimizer the tool ships is `lossless`: it only removes mechanically
- * redundant or no-op bytes (blank lines, exact duplicate instructions,
- * platform-default filler) and never rewrites or reorders meaningful guidance.
- * This is what backs the tool's "100% no loss of function" guarantee — a
- * property that can be checked deterministically, unlike an LLM rewrite.
+ * Legacy `lossless` label: edits pass structural text-signature checks.
+ * Removing duplicates or recognized filler can still change model behavior.
  */
 export type OptimizerSafety = 'lossless';
 
@@ -33,7 +30,7 @@ export interface FileOptimization {
   bytesBefore: number;
   bytesAfter: number;
   changes: OptimizerChangeRecord[];
-  /** True when the no-loss invariant held and the edit was kept. */
+  /** @deprecated Legacy alias for text-signature preservation, not behavior. */
   functionPreserved: boolean;
   /** Populated only when an edit was reverted because the invariant failed. */
   reverted?: string;
@@ -49,7 +46,7 @@ export interface OptimizationTotals {
   alwaysLoadedTokensBefore: number;
   alwaysLoadedTokensAfter: number;
   alwaysLoadedTokensSaved: number;
-  /** % of always-loaded tokens removed (saved on EVERY invocation). */
+  /** % of statically classified always-loaded source tokens removed. */
   alwaysLoadedReductionPct: number;
   filesScanned: number;
   filesChanged: number;
@@ -70,7 +67,7 @@ export interface ScoreDelta {
 /**
  * A CATES recommendation the optimizer deliberately did NOT auto-apply because
  * doing so safely requires human judgement (restructuring, rescoping, rewriting)
- * and therefore falls outside the lossless guarantee.
+ * and therefore falls outside the automatic text transformations.
  */
 export interface RemainingRecommendation {
   title: string;
@@ -99,9 +96,9 @@ export interface OptimizationResult {
   timestamp: string;
   tokenizer: string;
   dryRun: boolean;
-  /** Headline: % of active config tokens removed with no loss of function. */
+  /** Legacy name: % of active configuration source tokens removed. */
   efficiencyGainPct: number;
-  /** Always-loaded tokens removed — the recurring per-invocation saving. */
+  /** Legacy name: classified always-loaded source tokens removed, not runtime savings. */
   estimatedTokensSavedPerInvocation: number;
   totals: OptimizationTotals;
   score: ScoreDelta;
@@ -109,7 +106,10 @@ export interface OptimizationResult {
   files: FileOptimization[];
   remainingRecommendations: RemainingRecommendation[];
   guarantee: {
+    /** @deprecated Always false: behavioral preservation is not established. */
     noLossOfFunction: boolean;
+    textPreservationChecksPassed: boolean;
+    behaviorPreservation: 'not-assessed';
     method: string;
     invariantsChecked: string[];
   };
@@ -117,7 +117,7 @@ export interface OptimizationResult {
    * Experimental (non-normative) cache/output-shaping posture, present only when
    * run with experimental mode. ADVISORY — these are never auto-applied (they
    * require human judgement and would change behavior), so they fall outside the
-   * lossless guarantee. Shown so users can see the wider token impact.
+   * automatic text transformations. No behavioral guarantee is made.
    */
   experimental?: ExperimentalReport;
   /** Sibling `.orig` backups written, when --backup is set. */

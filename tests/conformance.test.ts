@@ -173,7 +173,7 @@ describe('evaluateConformance', () => {
       }),
       { requireLevel: 2 },
     );
-    expect(conf.failures).toContain('Prompt protection must be present in instruction-bearing configs.');
+    expect(conf.failures).toContain('Legacy SEC004 non-disclosure wording criterion must be satisfied; wording does not enforce confidentiality.');
     expect(conf.failures).toContain('Contradictory instructions must be resolved.');
     expect(conf.failures).toContain('Always-loaded tokens must be at or below 1,500.');
   });

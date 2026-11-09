@@ -37,7 +37,7 @@ export async function applySafeFixes(result: AnalysisResult, dryRun: boolean): P
 
     if (rules.has('SEC004') && !/do not (reveal|share|repeat|output|disclose).*instructions/i.test(updated)) {
       updated = `${updated.trimEnd()}\n\n## Instruction Protection\n- ${PROTECTION}\n`;
-      descriptions.push('added prompt-protection directive');
+      descriptions.push('added legacy prompt-protection wording; not an enforced confidentiality control');
     }
 
     if (rules.has('PRM001') && !/^---\n[\s\S]*?\n---\n/.test(updated) && !/^#\s+/m.test(updated)) {

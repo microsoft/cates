@@ -4,14 +4,12 @@ import type { OptimizerSafety } from './types.js';
 import { GENERIC_FILLER_PATTERNS } from '../analyzers/token-efficiency.js';
 
 /**
- * Lossless primitive optimizers.
+ * Structural primitive optimizers (legacy safety label: `lossless`).
  *
  * Each optimizer is a PURE function `string -> { content, changes }` that only
- * removes mechanically-redundant or no-op bytes. Together they back the
- * "100% no loss of function" guarantee: the set of meaningful instructions a
- * model receives is unchanged — only blank lines, exact duplicates, and
- * platform-default filler are stripped. The orchestrator independently verifies
- * this with {@link meaningfulSignature} before writing anything to disk.
+ * removes blank lines, duplicates and heuristically classified filler.
+ * The orchestrator compares {@link meaningfulSignature} before keeping edits.
+ * This verifies text properties, not unchanged model behavior.
  */
 
 export interface OptimizerEdit {
@@ -87,7 +85,7 @@ function isTableRow(line: string): boolean {
  * on prose: in structured files an identical line (e.g. `"type": "string",`) is
  * usually structurally significant, so removing a "duplicate" would change
  * meaning — which the signature check cannot detect. Structured primitives are
- * therefore left untouched, preserving the no-loss guarantee.
+ * therefore left untouched by the prose transformations.
  */
 export function isProseFile(relativePath: string): boolean {
   return PROSE_EXT_RE.test(relativePath) || PROSE_RULES_RE.test(relativePath);
@@ -356,10 +354,9 @@ export function selectOptimizers(only?: string[], skip?: string[]): Optimizer[] 
 }
 
 /**
- * The deterministic "no loss of function" signature of a primitive: the set of
- * its meaningful, non-filler instruction lines plus all code verbatim. Two
- * contents with the same signature deliver the same instructions to a model.
- * The orchestrator asserts signature(original) === signature(optimized).
+ * A structural signature: sorted, unique normalized non-filler/code-line entries.
+ * Equality ignores ordering and repetition; it does not prove semantic or
+ * behavioral equivalence. The orchestrator checks it before keeping edits.
  */
 export function meaningfulSignature(content: string): string {
   const lines = content.split('\n');

@@ -21,8 +21,8 @@ import type {
 } from './types.js';
 
 /**
- * Optimize the Copilot primitives in a repository for token efficiency while
- * guaranteeing no loss of function.
+ * Reduce source tokens in Copilot primitives using structural text checks.
+ * Model behavior and runtime savings require separate evaluation.
  *
  * Pipeline:
  *   1. Establish a baseline by running the CATES analyzer (or reusing a report).
@@ -92,7 +92,7 @@ export async function optimize(opts: OptimizeOptions): Promise<OptimizationResul
       originalByRelative.set(file.relativePath, original);
 
       // Only prose primitives are optimized; structured configs (JSON/YAML/shell)
-      // are never modified, to keep the no-loss-of-function guarantee airtight.
+      // are never modified by these prose transformations.
       if (!isProseFile(file.relativePath)) {
         structuredSkipped++;
         continue;
@@ -244,7 +244,7 @@ function remainingRecommendation(rec: Recommendation): RemainingRecommendation {
   if (rec.safety === 'manual') {
     reason = 'Security/critical change — must be reviewed and applied by a human.';
   } else if (rec.effort === 'moderate' || rec.effort === 'significant') {
-    reason = 'Requires restructuring or rewriting content, which falls outside the lossless guarantee.';
+    reason = 'Requires restructuring or rewriting beyond the automatic text checks.';
   } else {
     reason = 'Requires human judgement to preserve intent (e.g. rescoping or rephrasing).';
   }
@@ -331,14 +331,15 @@ function assembleResult(args: AssembleArgs): OptimizationResult {
     files: fileResults,
     remainingRecommendations: after.recommendations.map(remainingRecommendation),
     guarantee: {
-      noLossOfFunction: reverted === 0,
+      noLossOfFunction: false,
+      textPreservationChecksPassed: reverted === 0,
+      behaviorPreservation: 'not-assessed',
       method:
-        'Only lossless transforms (blank-line/whitespace hygiene, exact duplicate removal, platform-default filler removal). ' +
-        'Each file is verified to keep an identical set of meaningful instructions and byte-identical code blocks, then re-scored with the same CATES engine.',
+        'Checks compare a normalized set of non-filler lines and code-line entries, then re-score with the same CATES engine. ' +
+        'The set ignores order and repetition and uses heuristic filler classification. This does not prove semantic equivalence, unchanged model behavior, or runtime savings.',
       invariantsChecked: [
-        'meaningful-instruction-set equality (per file)',
-        'code-block byte identity (per file)',
-        'analyzer re-score parity (analyzeInMemory)',
+        'normalized non-filler/code-line set equality (per file)',
+        'analyzer re-score completed (analyzeInMemory; not behavioral validation)',
       ],
     },
     ...(after.experimental ?? before.experimental ? { experimental: after.experimental ?? before.experimental } : {}),
@@ -395,7 +396,9 @@ function emptyResult(
     files: [],
     remainingRecommendations: before.recommendations.map(remainingRecommendation),
     guarantee: {
-      noLossOfFunction: true,
+      noLossOfFunction: false,
+      textPreservationChecksPassed: true,
+      behaviorPreservation: 'not-assessed',
       method: 'No files were changed.',
       invariantsChecked: [],
     },

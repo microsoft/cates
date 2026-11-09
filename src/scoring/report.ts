@@ -4,6 +4,7 @@ import type { AnalysisResult } from '../types.js';
 import { getRule } from '../rules/catalog.js';
 import { ANALYZER_VERSION } from '../version.js';
 import { formatCopilot } from '../copilot/report.js';
+import { assessmentSummary, ASSESSMENT_NOTICE, SAVINGS_NOTICE } from '../assurance.js';
 
 /**
  * Format analysis results for different output targets.
@@ -12,7 +13,7 @@ import { formatCopilot } from '../copilot/report.js';
 export function createReport(result: AnalysisResult, format: 'pretty' | 'json' | 'sarif'): string {
   switch (format) {
     case 'json':
-      return JSON.stringify(result, null, 2);
+      return JSON.stringify({ ...result, assessment: assessmentSummary(result) }, null, 2);
     case 'sarif':
       return toSarif(result);
     case 'pretty':
@@ -33,8 +34,30 @@ function toPretty(result: AnalysisResult): string {
   lines.push('');
 
   // Overall Score
-  const gradeEmoji = score.grade === 'A+' || score.grade === 'A' ? '🏆' : score.grade === 'B' ? '✅' : score.grade === 'C' ? '⚠️' : '🚨';
-  lines.push(`  ${gradeEmoji} Overall Score: ${score.overall}/100 (Grade: ${score.grade})`);
+  const assessment = assessmentSummary(result);
+  lines.push(`  ${ASSESSMENT_NOTICE}`);
+  const gradeEmoji = assessment.criticalFindings > 0 ? '🚨' : '📋';
+  lines.push(`  ${gradeEmoji} Overall Score: ${score.overall}/100 (Grade: ${score.grade}; static criteria only)`);
+  if (assessment.criticalFindings > 0) {
+    lines.push(`  CRITICAL: ${assessment.criticalFindings} unresolved finding(s), regardless of grade.`);
+  }
+  if (assessment.excludedCriticalFindings > 0) {
+    lines.push(`  CRITICAL EXCLUSIONS: ${assessment.excludedCriticalFindings} critical finding(s) excluded by policy; not scored.`);
+  }
+  if (result.runtimeEvidence && result.runtimeEvidence.failedChecks > 0) {
+    lines.push(`  REPORTED RUNTIME FAILURES: ${result.runtimeEvidence.failedChecks} (not independently verified; static grade unchanged).`);
+  }
+  if (assessment.assessedFiles === 0) {
+    lines.push('  NOT ASSESSED: no active core-scan files; the grade is not a passing assessment.');
+  }
+  lines.push('  Runtime safety, effective permissions and task correctness: NOT ASSESSED.');
+  lines.push(`  Scope: ${assessment.assessedFiles} active file(s); ${assessment.inactiveFiles} inactive; ${assessment.discoveryLimitations} discovery limitation(s).`);
+  lines.push(`  ${assessment.coverageNotice}`);
+  lines.push(`  ${assessment.scoreBasis}`);
+  lines.push(`  Policy exclusions: ${assessment.suppressedFindings} suppressed finding(s), ${assessment.disabledFindings} disabled finding(s).`);
+  if (assessment.disabledRuleIds.length || assessment.disabledDimensions.length) {
+    lines.push(`  Disabled rules/dimensions: ${[...assessment.disabledRuleIds, ...assessment.disabledDimensions].join(', ')}`);
+  }
   lines.push('');
 
   lines.push('  ✨ Executive Summary:');
@@ -89,9 +112,10 @@ function toPretty(result: AnalysisResult): string {
 
   // Token savings impact
   if (discovery.totalTokens > 0) {
-   lines.push('  📉 Token Reduction Opportunity:');
-   lines.push(`     Direct:       ${formatPercent(result.savings.conservativePercentage)} of analyzed tokens (~${result.savings.conservativeTokensPerInvocation.toLocaleString()} tokens/invocation)`);
-   lines.push(`     Projected:    ${formatPercent(result.savings.projectedPercentage)} equivalent (~${result.savings.projectedTokensPerInvocation.toLocaleString()} tokens/invocation)`);
+   lines.push('  📉 Token Reduction Opportunity (heuristic configuration impact):');
+   lines.push(`     ${SAVINGS_NOTICE}`);
+   lines.push(`     Direct:       ${formatPercent(result.savings.conservativePercentage)} of analyzed tokens (~${result.savings.conservativeTokensPerInvocation.toLocaleString()} configuration tokens)`);
+   lines.push(`     Projected:    ${formatPercent(result.savings.projectedPercentage)} equivalent (~${result.savings.projectedTokensPerInvocation.toLocaleString()} hypothetical tokens)`);
    lines.push(`     Signal:       ${score.findingsPerThousandTokens.toFixed(1)} findings per 1K analyzed tokens`);
    lines.push('');
   }
@@ -111,7 +135,7 @@ function toPretty(result: AnalysisResult): string {
     lines.push('');
 
     // Top findings detail
-    const topFindings = findings
+    const topFindings = [...findings]
       .sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
       .slice(0, 10);
 
@@ -145,7 +169,7 @@ function toPretty(result: AnalysisResult): string {
       }
       if (rec.tokenSavings > 0) {
         const savingsLabel = rec.tokenSavingsKind === 'projected' ? 'Projected reduction' : 'Token reduction';
-        lines.push(`        ${savingsLabel}: ~${rec.tokenSavings} tokens/invocation (${formatPercent(rec.tokenSavingsPercentage ?? 0)} equivalent)`);
+        lines.push(`        ${savingsLabel}: ~${rec.tokenSavings} heuristic tokens (${formatPercent(rec.tokenSavingsPercentage ?? 0)} equivalent; runtime benefit unverified)`);
       }
       lines.push(`        Effort: ${rec.effort}`);
       if (rec.before && rec.after) {
@@ -160,6 +184,27 @@ function toPretty(result: AnalysisResult): string {
     lines.push(...experimentalLines(result));
   }
   if (result.copilot) lines.push(formatCopilot(result.copilot));
+  if (result.runtimeEvidence) {
+    const runtime = result.runtimeEvidence;
+    lines.push('  Runtime evidence: REPORTED, NOT VERIFIED (not scored)');
+    lines.push(`     ${runtime.context.client} | ${runtime.context.model} | ${runtime.context.revision} | ${runtime.recordedAt}`);
+    lines.push(`     Reported failed checks: ${runtime.failedChecks}`);
+    for (const check of runtime.checks) {
+      lines.push(`     ${check.kind}: ${check.status} - ${check.description}${check.evidence ? ` (${check.evidence})` : ''}`);
+    }
+    lines.push(`     Unassessed check kinds: ${runtime.unassessedChecks.join(', ') || 'none reported missing; scope still unverified'}`);
+    if (runtime.outcomes) {
+      for (const key of ['baseline', 'candidate'] as const) {
+        const cohort = runtime.outcomes[key];
+        lines.push(`     ${key}: ${cohort.acceptedTasks}/${cohort.attemptedTasks} tasks accepted; cost/accepted task: ${cohort.costPerAcceptedTask ?? 'unknown'} ${cohort.currency}`);
+      }
+      lines.push(`     Cost/accepted task change: ${runtime.outcomes.costPerAcceptedTaskChange ?? 'unknown/not comparable'} (candidate minus baseline).`);
+      lines.push(`     ${runtime.outcomes.note}`);
+    }
+    lines.push(`     ${runtime.note}`, '');
+  } else {
+    lines.push('  Runtime evidence: NOT SUPPLIED. Use --runtime-evidence to attach redacted probe/outcome records; this does not verify them.', '');
+  }
 
   lines.push('─'.repeat(62));
   lines.push(`  Analyzed: ${result.repoPath}`);
@@ -215,12 +260,12 @@ function toSarif(result: AnalysisResult): string {
     $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json',
     version: '2.1.0',
     runs: [{
-      ...(result.copilot || result.discovery.diagnostics ? {
         properties: {
+          assessment: assessmentSummary(result),
+          ...(result.runtimeEvidence ? { runtimeEvidence: result.runtimeEvidence } : {}),
           ...(result.copilot ? { copilot: result.copilot } : {}),
           ...(result.discovery.diagnostics ? { discoveryDiagnostics: result.discovery.diagnostics } : {}),
         },
-      } : {}),
       tool: {
         driver: {
               name: 'cates-analyzer',

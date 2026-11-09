@@ -71,6 +71,7 @@ async function runAnalyzeInMemory(req: AnalyzeRequest): Promise<HandlerResult<An
     const result = await analyzeInMemory({
       files: req.files,
       tokenizer: req.tokenizer,
+      runtimeEvidence: req.runtimeEvidence,
       ...policyOptions,
     });
     return { ok: true, status: 200, body: result };
@@ -94,6 +95,7 @@ async function runScan(req: ScanRequest): Promise<HandlerResult<AnalysisResult>>
       includeFiles: resolved.includeFiles,
       scanSubpath: resolved.scanSubpath,
       tokenizer: req.tokenizer,
+      runtimeEvidence: req.runtimeEvidence,
       ...policyOptions,
     };
     const result = await analyze(options);

@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 import { z } from 'zod';
 import { AnalyzerOptionsSchema, CopilotTargetSchema } from '../../src/types.js';
+import { RuntimeEvidenceSchema } from '../../src/assurance.js';
 
 // ─── Shared scalar schemas ───────────────────────────────────────────────────
 
@@ -69,6 +70,7 @@ export const FilePayloadSchema = z.object({
 
 export const AnalyzeRequestSchema = z
   .object({
+    runtimeEvidence: RuntimeEvidenceSchema.optional(),
     files: z
       .array(FilePayloadSchema)
       .min(1)
@@ -87,6 +89,7 @@ export type AnalyzeRequest = z.infer<typeof AnalyzeRequestSchema>;
 
 export const ScanRequestSchema = z
   .object({
+    runtimeEvidence: RuntimeEvidenceSchema.optional(),
     // Must be a GitHub URL — argv-injection guards in parseGitHubLink will
     // additionally validate the components before any shell-out happens.
     url: z

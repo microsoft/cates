@@ -6,6 +6,7 @@ import { evaluateConformance } from './conformance.js';
 import { DEFAULT_DEMO_REPOSITORIES, type DemoCategory, type DemoRepository } from './demo-repos.js';
 import { resolveReviewSource } from './sources.js';
 import type { AnalysisResult, Severity } from './types.js';
+import { ASSESSMENT_NOTICE, SAVINGS_NOTICE } from './assurance.js';
 
 export interface DemoScanOptions {
   reposFile?: string;
@@ -39,6 +40,8 @@ export interface DemoRepoResult {
 }
 
 export interface DemoScanResult {
+  assessmentNotice?: string;
+  savingsNotice?: string;
   generatedAt: string;
   reposRequested: number;
   reposScanned: number;
@@ -211,6 +214,8 @@ function summarizeDemoScan(reposRequested: number, repos: DemoRepoResult[]): Dem
 
   return {
     generatedAt: new Date().toISOString(),
+    assessmentNotice: ASSESSMENT_NOTICE,
+    savingsNotice: SAVINGS_NOTICE,
     reposRequested,
     reposScanned: scanned.length,
     reposFailed: repos.length - scanned.length,

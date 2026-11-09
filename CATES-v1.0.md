@@ -16,6 +16,14 @@
 > [Modern Agent Assurance](docs/MODERN-AGENT-ASSURANCE.md). That proposal is
 > non-normative, manually assessed, and not implemented as additional analyzer
 > rules, scores, or gates.
+>
+> Scores deduct detected findings from 100; they are not earned assurance.
+> A critical finding can coexist with an A-grade. Exclusions, suppressions,
+> severity overrides and scan scope affect comparisons. Static token-impact
+> estimates may overlap and are not measured runtime savings.
+> [Optional runtime records](docs/RUNTIME-EVIDENCE.md) can accompany reports,
+> but are caller-reported, not independently verified, and never affect these
+> v1 predicates, scores or gates.
 
 ## Abstract
 
@@ -25,7 +33,8 @@ CATES is designed as an actionable, tool-verifiable standard for this space — 
 
 Configuration content consumes context when an assistant actually loads it.
 Loading, caching, billing, and context limits vary by client and model. CATES
-provides discipline for managing that footprint without sacrificing capability.
+provides discipline for managing that footprint. Capability and task outcomes
+must be evaluated independently before adopting configuration changes.
 
 ---
 

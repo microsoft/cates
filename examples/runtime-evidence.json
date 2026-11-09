@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "recordedAt": "2026-01-01T00:00:00Z",
+  "context": {
+    "revision": "REPLACE_WITH_TESTED_REVISION",
+    "client": "REPLACE_WITH_CLIENT_AND_VERSION",
+    "model": "REPLACE_WITH_MODEL_AND_VERSION",
+    "environment": "REPLACE_WITH_DISPOSABLE_ENVIRONMENT"
+  },
+  "checks": [
+    { "kind": "effective-configuration", "description": "Capture effective loading, precedence and host/service permissions", "status": "not-run" },
+    { "kind": "permission-allow", "description": "Probe an explicitly permitted operation with synthetic data", "status": "not-run" },
+    { "kind": "permission-deny", "description": "Probe a forbidden operation and confirm host/service denial", "status": "not-run" },
+    { "kind": "task-acceptance", "description": "Evaluate representative tasks against independent acceptance criteria", "status": "not-run" }
+  ],
+  "outcomes": {
+    "baseline": {
+      "revision": "REPLACE_WITH_BASELINE_REVISION",
+      "taskSuite": "REPLACE_WITH_TASK_SUITE_ID",
+      "client": "REPLACE_WITH_CLIENT_AND_VERSION",
+      "model": "REPLACE_WITH_MODEL_AND_VERSION",
+      "environment": "REPLACE_WITH_DISPOSABLE_ENVIRONMENT",
+      "attemptedTasks": 0,
+      "acceptedTasks": 0,
+      "totalCost": null,
+      "currency": "USD",
+      "includesAllAttempts": false,
+      "evidence": "UNEXECUTED_TEMPLATE_REPLACE_WITH_REDACTED_ARTIFACT_REFERENCE"
+    },
+    "candidate": {
+      "revision": "REPLACE_WITH_TESTED_REVISION",
+      "taskSuite": "REPLACE_WITH_TASK_SUITE_ID",
+      "client": "REPLACE_WITH_CLIENT_AND_VERSION",
+      "model": "REPLACE_WITH_MODEL_AND_VERSION",
+      "environment": "REPLACE_WITH_DISPOSABLE_ENVIRONMENT",
+      "attemptedTasks": 0,
+      "acceptedTasks": 0,
+      "totalCost": null,
+      "currency": "USD",
+      "includesAllAttempts": false,
+      "evidence": "UNEXECUTED_TEMPLATE_REPLACE_WITH_REDACTED_ARTIFACT_REFERENCE"
+    }
+  }
+}

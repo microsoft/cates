@@ -4,8 +4,8 @@
  * CATES Configuration Analyzer
  *
  * Analyzes coding-agent configuration files for:
- * - Token efficiency (minimize waste per invocation)
- * - Security (no leaks, no injection vectors, no overly permissive instructions)
+ * - Token efficiency (heuristic configuration-token opportunities)
+ * - Security (detectable static patterns, not proof of effective protection)
  * - Quality (specificity, completeness, conflict-free)
  *
  * Core design principles:
@@ -19,6 +19,8 @@ export { analyze } from './analyzers/index.js';
 export { analyzeInMemory } from './analyze-in-memory.js';
 export type { AnalyzeInMemoryFile, AnalyzeInMemoryOptions } from './analyze-in-memory.js';
 export { createReport } from './scoring/report.js';
+export { RuntimeEvidenceSchema, summarizeRuntimeEvidence, assessmentSummary } from './assurance.js';
+export type { RuntimeEvidence, RuntimeEvidenceSummary } from './assurance.js';
 export { evaluateConformance, evaluateGates } from './conformance.js';
 export { RULE_CATALOG, getRule } from './rules/catalog.js';
 export { ANALYZER_VERSION } from './version.js';
@@ -33,7 +35,7 @@ export { analyzeEconomics, formatEconomics, EconomicsInputSchema, ECONOMICS_LIMI
 export type { EconomicsInput, EconomicsReport, RequestEconomics } from './economics/index.js';
 
 // Optimizer: a separate, deliberately-invoked tool that rewrites primitives for
-// token efficiency with a guaranteed no-loss-of-function property.
+// source-token reduction with structural text checks, not behavioral guarantees.
 export { optimize } from './optimizer/index.js';
 export { OPTIMIZERS, selectOptimizers, meaningfulSignature } from './optimizer/optimizers.js';
 export { renderOptimizationReport } from './optimizer/report.js';
