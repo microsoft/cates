@@ -38,7 +38,9 @@
     "docs/TOKEN-ECONOMICS.md",
     "docs/COPILOT-HYGIENE.md",
     "docs/MODERN-AGENT-ASSURANCE.md",
-    "examples/economics.json"
+    "docs/RUNTIME-EVIDENCE.md",
+    "examples/economics.json",
+    "examples/runtime-evidence.json"
   ],
   "scripts": {
     "build": "tsc && chmod +x dist/cli/index.js dist/optimizer/cli.js",

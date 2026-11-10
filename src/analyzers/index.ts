@@ -14,6 +14,7 @@ import { analyzeAgents } from './agents.js';
 import { analyzeCommands } from './commands.js';
 import { analyzeExperimental, type ExperimentalInput } from './experimental.js';
 import { calculateScore } from '../scoring/calculator.js';
+import { assessmentSummary, summarizeRuntimeEvidence } from '../assurance.js';
 import { generateRecommendations } from '../scoring/recommendations.js';
 import { calculateSavings } from '../scoring/savings.js';
 import { applySuppressions } from '../suppressions.js';
@@ -137,7 +138,7 @@ async function analyzeWithContext(options: AnalyzerOptions): Promise<AnalysisRes
     ? await analyzeCopilot(options, coreDiscovery)
     : undefined;
 
-  return {
+  const result: AnalysisResult = {
     repoPath: options.repoPath,
     timestamp: new Date().toISOString(),
     discovery,
@@ -153,4 +154,7 @@ async function analyzeWithContext(options: AnalyzerOptions): Promise<AnalysisRes
     ...(experimental ? { experimental } : {}),
     ...(copilot ? { copilot } : {}),
   };
+  result.assessment = assessmentSummary(result);
+  if (options.runtimeEvidence) result.runtimeEvidence = summarizeRuntimeEvidence(options.runtimeEvidence);
+  return result;
 }

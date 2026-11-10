@@ -2,6 +2,8 @@
 // Licensed under the MIT license.
 import { z } from 'zod';
 import type { CopilotReport } from './copilot/types.js';
+import { RuntimeEvidenceSchema } from './assurance.js';
+import type { assessmentSummary, RuntimeEvidenceSummary } from './assurance.js';
 
 // ─── Scoring Types ───────────────────────────────────────────────────────────
 
@@ -34,7 +36,7 @@ export interface Finding {
   line?: number;
   evidence?: string;
   suggestion?: string;
-  tokenImpact?: number; // estimated tokens saved if fixed
+  tokenImpact?: number; // heuristic configuration-token impact, not measured usage
 }
 
 /**
@@ -99,7 +101,7 @@ export interface Score {
   dimensions: DimensionScore[];
   totalFindings: number;
   criticalCount: number;
-  estimatedTokenWaste: number; // avoidable tokens per invocation
+  estimatedTokenWaste: number; // legacy name: overlapping heuristic configuration-token impacts
   estimatedTokenSavingsPercentage: number; // percent of analyzed active config tokens
   findingsPerThousandTokens: number;
 }
@@ -179,6 +181,10 @@ export interface DiscoveryDiagnostic {
 // ─── Analysis Types ──────────────────────────────────────────────────────────
 
 export interface AnalysisResult {
+  /** Static scope and exclusions; independent of the legacy score and gates. */
+  assessment?: ReturnType<typeof assessmentSummary>;
+  /** Caller-reported runtime evidence, never independently verified or scored. */
+  runtimeEvidence?: RuntimeEvidenceSummary;
   repoPath: string;
   timestamp: string;
   discovery: DiscoveryResult;
@@ -223,6 +229,7 @@ export const CopilotTargetSchema = z.enum(['all', 'cli', 'cloud-agent', 'code-re
 export type CopilotTarget = z.infer<typeof CopilotTargetSchema>;
 
 export const AnalyzerOptionsSchema = z.object({
+  runtimeEvidence: RuntimeEvidenceSchema.optional(),
   repoPath: z.string(),
   outputFormat: z.enum(['json', 'pretty', 'sarif']).default('pretty'),
   includeEvidence: z.boolean().default(true),

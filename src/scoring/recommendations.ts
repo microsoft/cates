@@ -279,13 +279,13 @@ export function generateRecommendations(
     });
   }
 
-  // System prompt protection missing → add protection
+  // Retain the legacy SEC004 criterion without implying enforceable protection.
   const noProtection = findings.filter(f => f.ruleId === 'SEC004');
   if (noProtection.length > 2) {
     recommendations.push({
       priority: 3,
-      title: '🛡️ Add system prompt protection to config files',
-      description: `${noProtection.length} config file(s) lack instruction-protection directives. Without them, users (or injected prompts) can extract your full agent configuration.`,
+      title: '🛡️ Review legacy SEC004 non-disclosure wording',
+      description: `${noProtection.length} config file(s) lack non-disclosure wording required by the legacy SEC004 criterion. Such wording is not access control; keep secrets outside prompts and validate host/service permissions.`,
       tokenSavings: 0,
       effort: 'trivial',
       before: '# My project instructions\n- Use TypeScript\n- Run tests before committing',
@@ -363,7 +363,7 @@ function inferRuleIds(title: string): string[] {
     [/test framework/i, ['STP004']],
     [/non-interactive/i, ['HK001']],
     [/heavy hooks/i, ['HK002']],
-    [/prompt protection/i, ['SEC004']],
+    [/legacy SEC004/i, ['SEC004']],
   ];
   return mapping.find(([pattern]) => pattern.test(title))?.[1] ?? [];
 }

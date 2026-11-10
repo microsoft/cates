@@ -1,5 +1,13 @@
 # Agentic SDLC for CATES
 
+Static scores and conformance are configuration criteria, not runtime approval.
+Before adopting agent configuration changes, use controlled allow/deny probes,
+independent task acceptance and before/after cost per accepted task.
+Attach redacted records with `--runtime-evidence` as described in
+[runtime evidence](RUNTIME-EVIDENCE.md); these are reported, not verified,
+and do not change the existing score or gates. Keep runtime release decisions
+with the evaluation system and human approvers.
+
 One issue, one agent workstream, one PR, existing delivery gates. No new
 orchestrator, hosted model, paid automation, or secret is required.
 This is a human-triggered coding-agent lifecycle, not an unattended merge bot.

@@ -8,6 +8,19 @@ The **initial scan remains a static configuration assessment**, not a bill or
 proof of economic performance. For end-to-end costs and accepted-task outcomes,
 use the separate, opt-in [experimental economics assessment](#experimental-end-to-end-token-economics).
 
+**A grade is not an assurance certificate.** Scores start at 100 and deduct
+detected findings after policy overrides and exclusions; one critical finding
+can coexist with an A. Reports highlight unresolved critical findings regardless
+of grade and disclose disabled/suppressed findings and discovery limits.
+No findings does not establish safety, effective permissions or task correctness.
+Compare scores only under the same policy and scan scope.
+
+To pair static results with controlled permission probes and before/after
+accepted-task costs, attach [optional runtime evidence](docs/RUNTIME-EVIDENCE.md):
+`cates-analyzer . --runtime-evidence runtime-evidence.json`.
+These records are **caller-reported, not independently verified**, and never
+change scores, conformance levels or CI gates.
+
 The [Modern Agent Assurance proposal](docs/MODERN-AGENT-ASSURANCE.md) records
 the October 29, 2026 standards review and current primary sources. It adds
 manual guidance for skills, effective permissions, MCP authorization, and
@@ -57,7 +70,7 @@ the npm and GHCR installation paths documented in the release notes become
 the recommended options.
 
 The package installs two commands: **`cates-analyzer`** (reports inefficiencies)
-and **`cates-optimize`** (deliberately applies the lossless fixes — see
+and **`cates-optimize`** (deliberately applies structurally checked edits — see
 [Optimizer](#-optimizer--apply-lossless-fixes-cates-optimize)).
 The programmatic package API is ESM-only; CommonJS callers must use dynamic
 `import()`.
@@ -354,7 +367,7 @@ rules:
 suppressions:
   - ruleId: SEC004
     file: .github/copilot-instructions.md
-    reason: Covered by organization-level prompt protection
+    reason: Legacy wording criterion waived; host access controls reviewed separately
     owner: @platform-team
     expires: 2026-12-31
 ```
@@ -427,7 +440,8 @@ cates-analyzer . --min-score 85 --fail-on critical,high
 ### 4. Refactor toward the CATES recommendations
 
 Every report contains a `recommendations` block, prioritized and
-estimated in tokens saved per invocation. Start at priority 1 and work
+estimated as heuristic configuration-token impacts, not measured savings. Impacts
+can overlap and may not reflect actual client loading. Start at priority 1 and work
 down — each item lists the affected files, the safety classification,
 and whether it's autofixable.
 
@@ -446,16 +460,17 @@ manifest (`cates-analyzer demo --limit 25`).
 The analyzer **reports** what's inefficient. `cates-optimize` is a **separate,
 deliberately-run tool** that **acts on that report**: it rewrites your Copilot
 primitives (instructions, prompts, chat modes, agents, skills, rules files) to be
-as token-efficient as possible **while guaranteeing no loss of function**, then
-prints a report of what it achieved and the estimated efficiency gain.
+reduce configuration source tokens using structural text checks, then
+prints source-token counts and a static re-score. It does **not** establish
+unchanged model behavior, task quality, request-token reductions or lower bills.
 
 It is intentionally **not** wired into `cates-analyzer` — you run it on purpose.
 
-### The guarantee
+### What the checks establish
 
-`cates-optimize` only applies **lossless** transforms — it never rewrites,
-reorders, or rescopes guidance. It strips only mechanically-redundant or no-op
-bytes:
+`cates-optimize` retains the legacy `lossless` safety label for compatibility.
+It removes duplicates, recognized filler and whitespace; even these edits can
+change how a model follows instructions. Available transformations:
 
 | Optimizer | Rule | What it removes |
 | --- | --- | --- |
@@ -464,9 +479,11 @@ bytes:
 | `remove-filler` | TE003 | Standalone lines that only restate model defaults (e.g. "You are a helpful assistant") |
 | `whitespace` | — | Trailing whitespace, blank-line runs (code fences untouched) |
 
-Before writing any file, the tool verifies the **meaningful-instruction set** and
-**every code block** are byte-for-byte preserved, then **re-scores with the same
-CATES engine** so the before/after numbers are exact. Anything that needs human
+Before writing any file, the tool compares a **normalized set of non-filler lines
+and code-line entries**, then **re-scores with the same CATES engine**.
+The signature ignores order and repetition and uses heuristic filler matching;
+it does not prove byte-identical code blocks or semantic/behavioral equivalence.
+Run representative before/after tasks before adopting edits. Anything that needs human
 judgement (restructuring always-loaded context, extracting big code examples,
 rewriting forced verbosity or negative-constraint lists, deduping across files,
 removing secrets) is **left untouched** and surfaced as "remaining opportunities".
@@ -492,7 +509,7 @@ cates-optimize . --only dedupe-lines,whitespace
 
 The report leads with the headline efficiency gain (token reduction on active and
 always-loaded config), a before/after table (tokens, CATES score, findings), the
-per-file changes, the no-loss-of-function guarantee log, and the remaining
+per-file changes, the text-check details and limitations, and the remaining
 manual opportunities.
 
 ## 🧪 Experimental: cache & output shaping
@@ -663,7 +680,7 @@ Policy suppressions can be used for documented false positives or temporary acce
 suppressions:
   - ruleId: SEC004
     file: .github/copilot-instructions.md
-    reason: Covered by organization-level prompt protection
+    reason: Legacy wording criterion waived; host access controls reviewed separately
     expires: 2026-12-31
 ```
 

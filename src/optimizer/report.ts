@@ -43,8 +43,8 @@ function toMarkdown(r: OptimizationResult): string {
   lines.push('');
 
   const headline = r.totals.activeTokensSaved > 0
-    ? `## Result: ${r.efficiencyGainPct}% more token-efficient (−${n(r.totals.activeTokensSaved)} tokens) — guaranteed no loss of function`
-    : '## Result: already optimal — no lossless token savings available';
+    ? `## Result: ${r.efficiencyGainPct}% fewer configuration tokens (−${n(r.totals.activeTokensSaved)} tokens)`
+    : '## Result: no source-token reduction from the selected transformations';
   lines.push(headline);
   lines.push('');
 
@@ -52,7 +52,7 @@ function toMarkdown(r: OptimizationResult): string {
   lines.push('| Metric | Before | After | Improvement |');
   lines.push('| --- | ---: | ---: | ---: |');
   lines.push(`| Active config tokens | ${n(r.totals.activeTokensBefore)} | ${n(r.totals.activeTokensAfter)} | ${reduction(r.totals.activeTokensBefore, r.totals.activeTokensAfter)} |`);
-  lines.push(`| Always-loaded tokens (per invocation) | ${n(r.totals.alwaysLoadedTokensBefore)} | ${n(r.totals.alwaysLoadedTokensAfter)} | ${reduction(r.totals.alwaysLoadedTokensBefore, r.totals.alwaysLoadedTokensAfter)} |`);
+  lines.push(`| Classified always-loaded source tokens | ${n(r.totals.alwaysLoadedTokensBefore)} | ${n(r.totals.alwaysLoadedTokensAfter)} | ${reduction(r.totals.alwaysLoadedTokensBefore, r.totals.alwaysLoadedTokensAfter)} |`);
   lines.push(`| CATES score | ${r.score.overallBefore} (${r.score.gradeBefore}) | ${r.score.overallAfter} (${r.score.gradeAfter}) | ${signed(r.score.overallAfter - r.score.overallBefore)} |`);
   lines.push(`| Token-efficiency findings | ${r.score.tokenEfficiencyFindingsBefore} | ${r.score.tokenEfficiencyFindingsAfter} | ${signed(r.score.tokenEfficiencyFindingsAfter - r.score.tokenEfficiencyFindingsBefore)} |`);
   lines.push(`| Total findings | ${r.score.totalFindingsBefore} | ${r.score.totalFindingsAfter} | ${signed(r.score.totalFindingsAfter - r.score.totalFindingsBefore)} |`);
@@ -60,12 +60,14 @@ function toMarkdown(r: OptimizationResult): string {
   lines.push('');
 
   if (r.estimatedTokensSavedPerInvocation > 0) {
-    lines.push(`> Always-loaded context is paid on **every** agent invocation, so the ${n(r.estimatedTokensSavedPerInvocation)} tokens removed there are saved on every single request going forward (${r.totals.alwaysLoadedReductionPct}% lighter).`);
+    lines.push(`> Removed ${n(r.estimatedTokensSavedPerInvocation)} source tokens classified as always-loaded (${r.totals.alwaysLoadedReductionPct}% reduction). Actual loading, caching, request costs and task outcomes were not measured.`);
     lines.push('');
   }
 
   // Guarantee
-  lines.push(`## ${r.guarantee.noLossOfFunction ? '✅' : '⚠️'} No loss of function`);
+  lines.push('## Text-preservation checks; behavior NOT ASSESSED');
+  lines.push('');
+  lines.push('No guarantee of unchanged agent behavior, task quality, or runtime savings. Run representative before/after tasks before adopting edits.');
   lines.push('');
   lines.push(r.guarantee.method);
   if (r.guarantee.invariantsChecked.length > 0) {
@@ -141,7 +143,7 @@ function toMarkdown(r: OptimizationResult): string {
     const xp = r.experimental;
     lines.push('## 🧪 Experimental opportunities (advisory — NOT auto-applied)');
     lines.push('');
-    lines.push('These cache/output-shaping smells fall **outside the lossless guarantee** (fixing them changes behavior), so the optimizer never touches them. Shown so you can see the wider token impact.');
+    lines.push('These cache/output-shaping smells require separate human review and runtime measurement, so the optimizer does not apply them.');
     lines.push('');
     for (const dim of xp.dimensions) {
       lines.push(`- **${dim.dimension}** — ${dim.findings.length} finding(s), ~${n(dim.estimatedTokenImpact)} est. tokens`);

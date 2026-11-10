@@ -94,9 +94,9 @@ describe('generateRecommendations', () => {
 
   it('emits SEC004 protection recommendation only when more than 2 occurrences', () => {
     const few = generateRecommendations([f('SEC004'), f('SEC004')], discovery);
-    expect(few.some(r => /system prompt protection/i.test(r.title))).toBe(false);
+    expect(few.some(r => /legacy SEC004/i.test(r.title))).toBe(false);
     const many = generateRecommendations([f('SEC004'), f('SEC004'), f('SEC004')], discovery);
-    expect(many.some(r => /system prompt protection/i.test(r.title))).toBe(true);
+    expect(many.some(r => /legacy SEC004/i.test(r.title))).toBe(true);
   });
 
   it('sorts recommendations by priority ascending', () => {
@@ -117,7 +117,7 @@ describe('generateRecommendations', () => {
       [f('SEC004'), f('SEC004'), f('SEC004')],
       discovery,
     );
-    const protection = recs.find(r => /system prompt protection/i.test(r.title));
+    const protection = recs.find(r => /legacy SEC004/i.test(r.title));
     expect(protection?.autofixable).toBe(true);
   });
 

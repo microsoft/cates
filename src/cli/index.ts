@@ -21,6 +21,8 @@ import { COPILOT_CHECKS, getCopilotCheck } from '../copilot/catalog.js';
 import { ANALYZER_VERSION } from '../version.js';
 import { analyzeEconomics, formatEconomics } from '../economics/index.js';
 import { readEconomicsInput } from '../economics/input.js';
+import { RuntimeEvidenceSchema, ASSESSMENT_NOTICE } from '../assurance.js';
+import { readBoundedJson } from '../utils/read-json.js';
 
 program
   .name('cates-analyzer')
@@ -84,6 +86,7 @@ program
   .option('--files <list>', 'Comma-separated relative file paths to analyze instead of auto-discovery')
   .option('--individual', 'Analyze each --files entry separately')
   .option('--no-evidence', 'Omit evidence snippets from output')
+  .option('--runtime-evidence <file>', 'Attach local caller-reported runtime JSON (not verified or scored)')
   .option('--min-score <n>', 'Fail if score is below this value')
   .option('--require-level <n>', 'Fail unless CATES conformance level is at least 1, 2, or 3')
   .option('--fail-on <list>', 'Comma-separated severities that fail the run (e.g. critical,high)')
@@ -109,6 +112,7 @@ program
   .option('--files <list>', 'Comma-separated relative file paths to analyze instead of auto-discovery')
   .option('--individual', 'Analyze each --files entry separately')
   .option('--no-evidence', 'Omit evidence snippets from output')
+  .option('--runtime-evidence <file>', 'Attach local caller-reported runtime JSON (not verified or scored)')
   .option('--min-score <n>', 'Fail if score is below this value')
   .option('--require-level <n>', 'Fail unless CATES conformance level is at least 1, 2, or 3')
   .option('--fail-on <list>', 'Comma-separated severities that fail the run (e.g. critical,high)')
@@ -159,7 +163,7 @@ program
       });
       const conformance = evaluateConformance(result, { ...policy, requireLevel: parseLevel(opts.requireLevel) });
       if (format === 'json') {
-        process.stdout.write(JSON.stringify({ repoPath, conformance }, null, 2) + '\n');
+        process.stdout.write(JSON.stringify({ repoPath, conformance, assessment: result.assessment }, null, 2) + '\n');
       } else {
         process.stdout.write(formatConformance(conformance) + '\n');
       }
@@ -306,6 +310,10 @@ async function runDemoCommand(opts: Record<string, unknown>): Promise<void> {
 }
 
 async function executeAnalyze(repoPath: string, opts: Record<string, unknown>, displayPath?: string, sourceFiles?: string[]): Promise<number> {
+  const evidenceFile = stringOpt(opts.runtimeEvidence);
+  const runtimeEvidence = evidenceFile
+    ? RuntimeEvidenceSchema.parse(await readBoundedJson(resolve(evidenceFile), 100_000, 'Runtime evidence'))
+    : undefined;
   const policy = await loadPolicy(repoPath, stringOpt(opts.policy));
   const includeFiles = opts.files === undefined ? sourceFiles ?? [] : fileListOpt(opts.files);
   const format = formatOpt(opts.format, ['pretty', 'json', 'sarif']);
@@ -318,7 +326,7 @@ async function executeAnalyze(repoPath: string, opts: Record<string, unknown>, d
     const results: AnalysisResult[] = [];
     let exitCode = 0;
     for (const includeFile of includeFiles) {
-      const result = await analyze(buildAnalyzeOptions(repoPath, opts, policy, [includeFile]));
+      const result = await analyze({ ...buildAnalyzeOptions(repoPath, opts, policy, [includeFile]), runtimeEvidence });
       results.push(withDisplayPath(result, displayPathFor(repoPath, displayPath, includeFile)));
       exitCode ||= evaluateResultGates(result, policy, opts);
     }
@@ -331,7 +339,7 @@ async function executeAnalyze(repoPath: string, opts: Record<string, unknown>, d
     return exitCode;
   }
 
-  const result = await analyze(buildAnalyzeOptions(repoPath, opts, policy, includeFiles));
+  const result = await analyze({ ...buildAnalyzeOptions(repoPath, opts, policy, includeFiles), runtimeEvidence });
 
   if (opts.fix || opts.fixDryRun) {
     const fixResult = await applySafeFixes(result, Boolean(opts.fixDryRun));
@@ -445,7 +453,7 @@ async function runReview(source: string, opts: Record<string, unknown>): Promise
 }
 
 function formatConformance(conformance: ReturnType<typeof evaluateConformance>): string {
-  const lines = [`${conformance.label}`, `Passed required level: ${conformance.passed ? 'yes' : 'no'}`];
+  const lines = [ASSESSMENT_NOTICE, `${conformance.label} (static criteria only)`, `Passed required level: ${conformance.passed ? 'yes' : 'no'}`];
   if (conformance.failures.length) lines.push('', 'Failures:', ...conformance.failures.map(f => `- ${f}`));
   if (conformance.nextLevelActions.length) lines.push('', 'Next actions:', ...conformance.nextLevelActions.map(a => `- ${a}`));
   return lines.join('\n');
@@ -453,14 +461,15 @@ function formatConformance(conformance: ReturnType<typeof evaluateConformance>):
 
 function formatPortfolio(portfolio: Awaited<ReturnType<typeof scanPortfolio>>): string {
   const lines = [
+    ASSESSMENT_NOTICE,
     `CATES Portfolio: ${portfolio.rootPath}`,
     `Repositories: ${portfolio.totals.repos}`,
     `Findings: ${portfolio.totals.findings} (${portfolio.totals.critical} critical)`,
-    `Token reduction opportunity: ${portfolio.totals.projectedTokenSavingsPercentage.toFixed(1)}%`,
+    `Token reduction opportunity (overlapping static heuristics, not runtime savings): ${portfolio.totals.projectedTokenSavingsPercentage.toFixed(1)}%`,
     '',
   ];
   for (const repo of portfolio.repos.sort((a, b) => a.score - b.score)) {
-    lines.push(`${repo.score}/100 ${repo.grade} L${repo.level} ${repo.path}`);
+    lines.push(`${repo.score}/100 ${repo.grade} L${repo.level} ${repo.path} (${repo.critical} critical, regardless of grade)`);
   }
   return lines.join('\n');
 }
@@ -468,9 +477,10 @@ function formatPortfolio(portfolio: Awaited<ReturnType<typeof scanPortfolio>>): 
 function formatDemo(result: DemoScanResult): string {
   const lines = [
     'CATES Demo Scan',
+    ASSESSMENT_NOTICE,
     `Repositories: ${result.reposScanned}/${result.reposRequested} scanned (${result.reposFailed} failed)`,
     `Average score: ${result.totals.averageScore}/100`,
-    `Token reduction opportunity: ${result.totals.averageProjectedReductionPercentage.toFixed(1)}%`,
+    `Token reduction opportunity (overlapping static heuristics, not runtime savings): ${result.totals.averageProjectedReductionPercentage.toFixed(1)}%`,
     `Finding density: ${result.totals.averageFindingsPerThousandTokens.toFixed(1)} findings per 1K analyzed tokens`,
     `Findings: ${result.totals.findings} total (${result.totals.critical} critical, ${result.totals.high} high)`,
     `Config footprint: ${result.totals.configFiles} files / ${result.totals.totalTokens.toLocaleString()} tokens`,
@@ -606,7 +616,7 @@ function buildCompletionScript(shell: 'bash' | 'zsh'): string {
   const subcommands = ['analyze', 'review', 'demo', 'portfolio', 'economics', 'conformance', 'rules', 'explain', 'tokenizers', 'completion', 'help'];
   const flags = [
     '--format', '--quiet', '--policy', '--max-files', '--max-depth', '--files', '--individual',
-    '--no-evidence', '--min-score', '--require-level', '--fail-on', '--max-always-loaded',
+    '--no-evidence', '--runtime-evidence', '--min-score', '--require-level', '--fail-on', '--max-always-loaded',
     '--tokenizer', '--compare-tokenizers', '--fix', '--fix-dry-run', '--demo', '--repos-file',
     '--category', '--limit', '--concurrency', '--keep-worktree', '--no-gh', '--fail-fast',
     '--experimental', '--experimental-only', '--copilot', '--no-copilot',

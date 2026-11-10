@@ -181,13 +181,15 @@ describe('optimize() integration', () => {
     await rm(repo, { recursive: true, force: true });
   });
 
-  it('reduces tokens losslessly and writes the file', async () => {
+  it('reduces source tokens with structural checks and writes the file', async () => {
     const result = await optimize({ repoPath: repo });
 
     expect(result.totals.activeTokensSaved).toBeGreaterThan(0);
     expect(result.efficiencyGainPct).toBeGreaterThan(0);
     expect(result.totals.filesChanged).toBe(1);
-    expect(result.guarantee.noLossOfFunction).toBe(true);
+    expect(result.guarantee.noLossOfFunction).toBe(false);
+    expect(result.guarantee.textPreservationChecksPassed).toBe(true);
+    expect(result.guarantee.behaviorPreservation).toBe('not-assessed');
     expect(result.score.tokenEfficiencyFindingsAfter)
       .toBeLessThan(result.score.tokenEfficiencyFindingsBefore);
 
@@ -327,8 +329,10 @@ describe('renderOptimizationReport', () => {
     const result = await optimize({ repoPath: repo, dryRun: true, backup: false });
     const md = renderOptimizationReport(result, 'markdown');
     expect(md).toMatch(/# CATES Optimization Report/);
-    expect(md).toMatch(/more token-efficient.*guaranteed no loss of function/);
-    expect(md).toMatch(/No loss of function/);
+    expect(md).toMatch(/fewer configuration tokens/);
+    expect(md).toMatch(/behavior NOT ASSESSED/);
+    expect(md).toMatch(/No guarantee of unchanged agent behavior/);
+    expect(md).not.toMatch(/guaranteed no loss of function/);
     expect(md).toMatch(/Optimizations applied/);
     expect(md).toMatch(/Remaining opportunities/);
     expect(md.endsWith('\n')).toBe(true);
@@ -339,7 +343,9 @@ describe('renderOptimizationReport', () => {
     const json = renderOptimizationReport(result, 'json');
     const parsed = JSON.parse(json);
     expect(parsed.efficiencyGainPct).toBeGreaterThan(0);
-    expect(parsed.guarantee.noLossOfFunction).toBe(true);
+    expect(parsed.guarantee.noLossOfFunction).toBe(false);
+    expect(parsed.guarantee.textPreservationChecksPassed).toBe(true);
+    expect(parsed.guarantee.behaviorPreservation).toBe('not-assessed');
     expect(Array.isArray(parsed.files)).toBe(true);
   });
 
@@ -347,14 +353,15 @@ describe('renderOptimizationReport', () => {
     expect(escapeMarkdownTableCell('a\\|b\r\nc')).toBe(String.raw`a\\\|b<br>c`);
   });
 
-  it('reports "already optimal" when nothing can be saved', async () => {
+  it('reports no applicable reduction without claiming global optimality', async () => {
     const clean = await mkdtemp(join(tmpdir(), 'cates-clean-'));
     try {
       await mkdir(join(clean, '.github'), { recursive: true });
       await writeFile(join(clean, INSTRUCTIONS), '# Title\n\nUse Vitest for tests.\n', 'utf-8');
       const result = await optimize({ repoPath: clean, dryRun: true });
       const md = renderOptimizationReport(result, 'markdown');
-      expect(md).toMatch(/already optimal/);
+      expect(md).toMatch(/no source-token reduction from the selected transformations/);
+      expect(md).not.toMatch(/already optimal/);
     } finally {
       await rm(clean, { recursive: true, force: true });
     }

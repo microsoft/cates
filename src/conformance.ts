@@ -2,8 +2,11 @@
 // Licensed under the MIT license.
 import type { AnalysisResult, Severity } from './types.js';
 import type { CatesPolicy } from './policy.js';
+import { ASSESSMENT_NOTICE } from './assurance.js';
 
 export interface ConformanceResult {
+  /** Static criteria only; no runtime certification implied. */
+  assessmentNotice?: string;
   level: 0 | 1 | 2 | 3;
   label: string;
   passed: boolean;
@@ -25,6 +28,7 @@ export function evaluateConformance(result: AnalysisResult, policy: CatesPolicy 
   const failures = required === 1 ? level1 : required === 2 ? level2 : level3;
 
   return {
+    assessmentNotice: ASSESSMENT_NOTICE,
     level,
     label: level === 0 ? 'Not conformant' : `CATES Level ${level}`,
     passed: level >= required,
@@ -70,7 +74,7 @@ function level2Failures(result: AnalysisResult): string[] {
   if (result.findings.some(f => f.severity === 'critical' || f.severity === 'high')) failures.push('Critical and high findings must be resolved.');
   if (result.score.overall < 70) failures.push('Overall score must be at least 70.');
   if (result.discovery.alwaysLoadedTokens > 1500) failures.push('Always-loaded tokens must be at or below 1,500.');
-  if (result.findings.some(f => f.ruleId === 'SEC004')) failures.push('Prompt protection must be present in instruction-bearing configs.');
+  if (result.findings.some(f => f.ruleId === 'SEC004')) failures.push('Legacy SEC004 non-disclosure wording criterion must be satisfied; wording does not enforce confidentiality.');
   if (result.findings.some(f => f.ruleId === 'CNF001')) failures.push('Contradictory instructions must be resolved.');
   return failures;
 }

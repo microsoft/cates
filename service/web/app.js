@@ -34,10 +34,35 @@
     const hasCoreFiles = data.discovery.files.some(file => file.isActive);
     $('r-score').textContent = hasCoreFiles ? data.score.overall : '—';
     $('r-score').className = 'value ' + (hasCoreFiles ? gradeClass(data.score.grade) : '');
+    const excludedCritical = [...(data.suppressedFindings ?? []), ...(data.disabledFindings ?? [])]
+      .filter(finding => finding.severity === 'critical').length;
+    if (data.score.criticalCount > 0 || excludedCritical > 0) $('r-score').className = 'value grade-F';
     $('r-grade').textContent = hasCoreFiles ? data.score.grade : 'No active core-scan files';
 
     $('r-findings').textContent = data.findings.length;
     $('r-critical').textContent = data.score.criticalCount + ' critical';
+    $('r-critical-warning').hidden = data.score.criticalCount === 0 && excludedCritical === 0;
+    $('r-critical-warning').textContent = `${data.score.criticalCount} unresolved CRITICAL finding(s), regardless of grade.${excludedCritical ? ` ${excludedCritical} additional critical finding(s) excluded by policy; not scored.` : ''}`;
+    $('r-policy-scope').textContent = `Scope: ${data.discovery.files.filter(file => file.isActive).length} discovered active file(s) only; unrecognized, excluded and external surfaces are not assessed. Policy exclusions: ${data.suppressedFindings?.length ?? 0} suppressed finding(s), ${data.disabledFindings?.length ?? 0} disabled finding(s). Disabled rules/dimensions: ${[...(data.disabledRuleIds ?? []), ...(data.disabledDimensions ?? [])].join(', ') || 'none reported'}.`;
+    const runtime = data.runtimeEvidence;
+    $('r-runtime-warning').hidden = !runtime?.failedChecks;
+    $('r-runtime-warning').textContent = runtime?.failedChecks
+      ? `${runtime.failedChecks} REPORTED RUNTIME FAILURE(S). Not independently verified; static grade unchanged.`
+      : '';
+    $('r-runtime-summary').textContent = runtime
+      ? `REPORTED, NOT VERIFIED: ${runtime.context.client}, revision ${runtime.context.revision}, recorded ${runtime.recordedAt}. ${runtime.failedChecks} reported failed check(s). Unassessed: ${runtime.unassessedChecks.join(', ') || 'none reported missing; scope unverified'}. ${runtime.note}`
+      : 'No runtime evidence supplied. Effective loading, permissions, task correctness and actual costs remain unassessed.';
+    $('r-runtime-checks').innerHTML = (runtime?.checks ?? []).map(check =>
+      `<p class="hint"><strong>${escape(check.kind)}: ${escape(check.status)}</strong> — ${escape(check.description)}${check.evidence ? ` (${escape(check.evidence)})` : ''}</p>`
+    ).join('');
+    const outcomes = runtime?.outcomes;
+    $('r-runtime-outcomes').hidden = !outcomes;
+    $('r-runtime-outcomes').textContent = outcomes
+      ? ['baseline', 'candidate'].map(key => {
+          const cohort = outcomes[key];
+          return `${key}: ${cohort.acceptedTasks}/${cohort.attemptedTasks} tasks accepted; cost/accepted task: ${cohort.costPerAcceptedTask ?? 'unknown'} ${cohort.currency}.`;
+        }).join(' ') + ` Change (candidate minus baseline): ${outcomes.costPerAcceptedTaskChange ?? 'unknown/not comparable'}. ${outcomes.note}`
+      : '';
 
     $('r-tokens').textContent = (data.discovery?.alwaysLoadedTokens ?? 0).toLocaleString();
     $('r-waste').textContent = data.score.estimatedTokenWaste.toLocaleString();
@@ -275,13 +300,20 @@
     }
   });
 
+  async function runtimeEvidencePayload() {
+    const file = $('runtime-evidence-file').files?.[0];
+    if (!file) return {};
+    if (file.size > 100_000) throw new Error('Runtime evidence exceeds 100,000 bytes.');
+    return { runtimeEvidence: JSON.parse(await file.text()) };
+  }
+
   $('run-paste').addEventListener('click', async () => {
     const content = $('paste-content').value;
     const path = $('paste-type').value;
     if (!content.trim()) return showError('Paste some content first.');
     const btn = $('run-paste'); btn.disabled = true; $('paste-status').textContent = 'Scoring…';
     try {
-      const body = { files: [{ path, content }] };
+      const body = { files: [{ path, content }], ...await runtimeEvidencePayload() };
       const policy = policyPayload();
       if (policy) body.policy = policy;
       const data = await postJson('/api/analyze', body);
@@ -298,7 +330,7 @@
     if (!url) return showError('Enter a GitHub URL first.');
     const btn = $('run-scan'); btn.disabled = true; $('scan-status').textContent = 'Cloning + scoring (this can take a few seconds)…';
     try {
-      const body = { url };
+      const body = { url, ...await runtimeEvidencePayload() };
       const policy = policyPayload();
       if (policy) body.policy = policy;
       const data = await postJson('/api/scan', body);

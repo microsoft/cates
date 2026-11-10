@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { analyze } from './analyzers/index.js';
 import { evaluateConformance } from './conformance.js';
 import type { AnalysisResult } from './types.js';
+import { ASSESSMENT_NOTICE, SAVINGS_NOTICE } from './assurance.js';
 
 export interface PortfolioRepoResult {
   path: string;
@@ -18,6 +19,8 @@ export interface PortfolioRepoResult {
 }
 
 export interface PortfolioResult {
+  assessmentNotice?: string;
+  savingsNotice?: string;
   rootPath: string;
   repos: PortfolioRepoResult[];
   totals: {
@@ -53,6 +56,8 @@ export async function scanPortfolio(rootPath: string): Promise<PortfolioResult> 
 
   return {
     rootPath: root,
+    assessmentNotice: ASSESSMENT_NOTICE,
+    savingsNotice: SAVINGS_NOTICE,
     repos,
     totals: {
       repos: repos.length,

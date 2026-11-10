@@ -52,6 +52,7 @@
     .row > label.field { flex: 1 1 220px; }
     .row > * { min-width: 0; }
     button, select { min-height: 44px; }
+    input[type=file] { min-height: 44px; max-width: 100%; color: var(--text); font: inherit; }
     button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, summary:focus-visible {
       outline: 2px solid var(--accent); outline-offset: 3px;
     }
@@ -87,7 +88,8 @@
     .finding-card { padding: 14px; border: 1px solid var(--border); border-radius: 10px; margin: 10px 0; }
     .finding-card p { margin: 8px 0 0; line-height: 1.5; }
     .finding-card header { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .scope-note { padding: 12px 14px; border-left: 3px solid var(--warn); background: var(--panel); line-height: 1.5; }
+    .scope-note { padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); line-height: 1.5; overflow-wrap: anywhere; }
+    #r-critical-warning, #r-runtime-warning { color: var(--bad); border-color: var(--bad); font-weight: 700; }
     .profile-description { margin-bottom: 0; }
 
     .pill { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -166,6 +168,19 @@
     <p class="hint profile-description" id="profile-description">Adds configuration hygiene and coverage notes without changing your stable score. Organization policies and runtime behavior still need verification.</p>
   </section>
 
+  <details class="drawer">
+    <summary>Optional runtime evidence · reported, not verified</summary>
+    <div class="drawer-body">
+    <label class="field">
+      <span>Redacted runtime evidence JSON (up to 100 KB)</span>
+      <input id="runtime-evidence-file" type="file" accept=".json,application/json" aria-describedby="runtime-evidence-help" />
+    </label>
+    <p class="hint" id="runtime-evidence-help">Sent to this service with your next scan.
+      Do not include secrets or sensitive transcripts. CATES validates the record shape,
+      not its truth; evidence never changes static scores or gates.</p>
+    </div>
+  </details>
+
   <details class="drawer" id="toggle-drawer">
     <summary>Rule &amp; dimension toggles · export as <code>.cates.yml</code></summary>
     <div class="drawer-body">
@@ -237,14 +252,32 @@
   </section>
 
   <section id="result" hidden>
-    <h2>Stable CATES score</h2>
+    <h2>Static CATES configuration score</h2>
+    <p class="scope-note">Static configuration assessment, not runtime assurance or security certification.
+      Effective permissions, task correctness and runtime savings are not verified.</p>
+    <p class="scope-note" id="r-critical-warning" role="status" hidden></p>
+    <p class="scope-note" id="r-runtime-warning" role="status" hidden></p>
+    <p class="hint" id="r-policy-scope"></p>
+    <p class="hint">Scores deduct detected findings from 100 after policy overrides and exclusions.
+      A higher score can reflect narrower coverage; compare only under the same policy and scope.</p>
     <p class="scope-note" id="r-discovery-warning" hidden></p>
     <div class="grid">
       <div class="card"><div class="label">Overall</div><div class="value" id="r-score"></div><div class="sub" id="r-grade"></div></div>
       <div class="card"><div class="label">Findings</div><div class="value" id="r-findings"></div><div class="sub" id="r-critical"></div></div>
-      <div class="card"><div class="label">Always-loaded tokens</div><div class="value" id="r-tokens"></div><div class="sub">per invocation</div></div>
-      <div class="card"><div class="label">Avoidable waste</div><div class="value" id="r-waste"></div><div class="sub" id="r-waste-pct"></div></div>
+      <div class="card"><div class="label">Classified always-loaded</div><div class="value" id="r-tokens"></div><div class="sub">source tokens; loading unverified</div></div>
+      <div class="card"><div class="label">Potential token impact</div><div class="value" id="r-waste"></div><div class="sub" id="r-waste-pct"></div></div>
     </div>
+    <p class="hint">Token impacts are overlapping configuration heuristics, not measured request usage, bills or proven savings.</p>
+    <details class="drawer" id="r-runtime-details">
+      <summary>Runtime evidence and assessment limits</summary>
+      <div class="drawer-body">
+      <p class="hint" id="r-runtime-summary">No runtime evidence supplied. Static scoring does not test agent behavior.</p>
+      <div id="r-runtime-checks"></div>
+      <p class="hint" id="r-runtime-outcomes" hidden></p>
+      <p class="hint">Use the CLI <code>--runtime-evidence</code> option or API <code>runtimeEvidence</code> input
+        to attach redacted permission probes and before/after accepted-task costs. Records are caller-reported, not independently verified or scored.</p>
+      </div>
+    </details>
 
     <h2>Dimensions</h2>
     <div class="table-scroll"><table>
